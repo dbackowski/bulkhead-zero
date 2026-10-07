@@ -11,11 +11,11 @@ import (
 
 const (
 	playerSpeed  = 85.0
-	playerMaxHP  = 10
 	playerHW     = 4.0 // collision half-size around the feet
 	playerHH     = 3.0
+	playerMaxHP  = 8
 	hurtAnimTime = 0.16
-	invulnTime   = 0.7
+	invulnTime   = 0.45
 )
 
 // Slot order for keys 1/2/3.

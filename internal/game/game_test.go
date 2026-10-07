@@ -1,6 +1,9 @@
 package game
 
-import "testing"
+import (
+	"math/rand"
+	"testing"
+)
 
 // Plays the level with the autopilot, without a window, and checks the round
 // flows: enemies die, the deck can be cleared or lost, and restart works.
@@ -74,5 +77,40 @@ func TestBarrelChainReaction(t *testing.T) {
 	}
 	if n < 1 || len(g.scorches) != n {
 		t.Fatalf("exploded %d barrels, %d scorch marks", n, len(g.scorches))
+	}
+}
+
+// Difficulty guard-rail: the handicapped autopilot (shaky aim, slow reactions)
+// should usually clear the deck, but not without getting hurt. Run with -v to
+// see the numbers when tuning stats, HP or invulnerability.
+func TestDifficulty(t *testing.T) {
+	const rounds = 20
+	clears, hpLeft := 0, 0
+	for seed := int64(1); seed <= rounds; seed++ {
+		g, err := New()
+		if err != nil {
+			t.Fatal(err)
+		}
+		g.rng = rand.New(rand.NewSource(seed))
+		if err := g.reset(); err != nil {
+			t.Fatal(err)
+		}
+		g.autopilot = newHumanAutopilot()
+		for i := 0; i < 60*180 && g.state == statePlaying && !g.player.Dead; i++ {
+			if err := g.Update(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if g.state == stateClear {
+			clears++
+			hpLeft += g.player.HP
+		}
+	}
+	t.Logf("cleared %d/%d, avg HP left %.1f/%d", clears, rounds, float64(hpLeft)/float64(max(clears, 1)), playerMaxHP)
+	if clears < rounds/2 {
+		t.Errorf("too hard: cleared only %d/%d", clears, rounds)
+	}
+	if hpLeft > clears*playerMaxHP*3/4 {
+		t.Errorf("too easy: avg HP left %.1f of %d", float64(hpLeft)/float64(clears), playerMaxHP)
 	}
 }

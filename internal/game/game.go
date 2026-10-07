@@ -75,7 +75,11 @@ func New() (*Game, error) {
 		g.weapons = append(g.weapons, w)
 	}
 	g.canvas = ebiten.NewImage(ScreenW, ScreenH)
-	if os.Getenv("BZ_AUTOPILOT") != "" {
+	switch os.Getenv("BZ_AUTOPILOT") {
+	case "":
+	case "human":
+		g.autopilot = newHumanAutopilot()
+	default:
 		g.autopilot = newAutopilot()
 	}
 	if dir := os.Getenv("BZ_RECORD"); dir != "" {

@@ -151,18 +151,24 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   spitters lob acid that leads the player (a growing ground marker shows where it lands);
   drones keep 85–140 px away, strafe, fly over props and fire lasers. Crates block bullets and lasers in both directions (cover).
 - **Explosive barrels** take 3 hits, damage everything within ~44 px and chain to nearby barrels.
-- **Dev tools** (`internal/game/devtools.go`): `BZ_AUTOPILOT=1` lets a bot play;
+- **Dev tools** (`internal/game/devtools.go`): `BZ_AUTOPILOT=1` lets a bot play
+  (`BZ_AUTOPILOT=human` gives it shaky aim and 0.35 s reactions, a rough stand-in for a person);
   `BZ_RECORD=dir BZ_RECORD_SECONDS=30` saves every 3rd frame as PNG and then quits.
   `docs/previews/gameplay.gif` was made that way.
 - **Tests:** world parsing/connectivity (every spawn reachable), autotile vs the Python
   golden data, collision, line of sight, flow-field following, metadata completeness,
   facing sectors, and full rounds played by the autopilot (clear, death, restart, barrel chains).
+  `TestDifficulty` plays 20 seeded rounds with the handicapped bot and fails if it clears under
+  half of them or keeps over 75% HP on average; run it with `-v` while tuning.
   Keep `TestStationIsConnected` passing when editing the map.
 
 ## Next steps
 
-- **Difficulty tuning.** The autopilot clears the deck in ~30 s losing 1 HP; humans aim worse,
-  but play it and adjust `stats`, weapon `damage` in `make_sprites.py`, HP and invulnerability time.
+- **Difficulty: play-test it.** Tuned against the bots only (October 2026): player 8 HP and
+  0.45 s invulnerability; crawlers 4 HP at 70 px/s; drones 7 HP; ranged cooldowns 2.0 s;
+  shots lead the player more (`globLead`, `laserLead`, `laserSpeed` in `enemy.go`). The
+  handicapped bot now clears in ~40 s with about 4.5/8 HP left and dies in a few % of rounds.
+  Most damage comes late (no healing), so pickups are the next lever if it feels harsh.
 - Real font for the HUD (currently `ebitenutil.DebugPrint`), ammo and reloading, pickups.
 - Sound (Ebitengine `audio` package), muzzle and impact sounds first.
 - Closed doors that open when approached (`door_half` frame exists), more levels, a level

@@ -2,7 +2,8 @@ package game
 
 // Development helpers, off unless their environment variables are set:
 //
-//	BZ_AUTOPILOT=1   a simple bot plays the game (handy for soak tests and demos)
+//	BZ_AUTOPILOT=1   a simple bot plays the game (handy for soak tests and demos);
+//	                 BZ_AUTOPILOT=human gives it shaky aim and slow reactions
 //	BZ_RECORD=dir    save every 3rd frame as PNG into dir, then quit after
 //	                 BZ_RECORD_SECONDS (default 40) seconds of game time
 //
@@ -27,9 +28,22 @@ type autopilot struct {
 	field     []int
 	fieldFor  *Enemy
 	fieldTime float64
+
+	// handicap, to play roughly like a person: aim wanders up to aimErr px
+	// around the target, and it holds fire for reaction s after spotting one
+	// (a target out of sight for under 0.5 s still counts as spotted)
+	aimErr, reaction float64
+	wobble           geom.Vec
+	seen, lost       float64
 }
 
 func newAutopilot() *autopilot { return &autopilot{mouse: geom.V(ScreenW/2+60, ScreenH/2)} }
+
+func newHumanAutopilot() *autopilot {
+	a := newAutopilot()
+	a.aimErr, a.reaction = 10, 0.35
+	return a
+}
 
 func (a *autopilot) input(g *Game, _ Input) Input {
 	in := Input{SelectSlot: -1}
@@ -59,6 +73,18 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	if vis != nil {
 		aimAt = vis.Pos.Sub(geom.V(0, vis.height()-2))
 	}
+	if a.aimErr > 0 {
+		a.wobble = a.wobble.Add(geom.V(g.rng.NormFloat64(), g.rng.NormFloat64()).Scale(a.aimErr * 0.25))
+		if l := a.wobble.Len(); l > a.aimErr {
+			a.wobble = a.wobble.Scale(a.aimErr / l)
+		}
+		aimAt = aimAt.Add(a.wobble)
+	}
+	if vis != nil {
+		a.seen, a.lost = a.seen+dt, 0
+	} else if a.lost += dt; a.lost > 0.5 {
+		a.seen = 0
+	}
 	target := aimAt.Sub(geom.V(math.Round(g.cam.X), math.Round(g.cam.Y)))
 	a.mouse = a.mouse.Lerp(target, 0.3)
 	in.Mouse = a.mouse
@@ -75,7 +101,7 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		in.SelectSlot = slot
 	}
 	if vis != nil {
-		onTarget := math.Abs(angleDiff(target.Sub(g.handPos().Sub(g.cam)).Angle(), p.Aim)) < 0.3
+		onTarget := math.Abs(angleDiff(target.Sub(g.handPos().Sub(g.cam)).Angle(), p.Aim)) < 0.3 && a.seen >= a.reaction
 		in.Fire = onTarget
 		in.FirePressed = onTarget && int(a.t*60)%14 == 0
 	}

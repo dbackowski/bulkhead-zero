@@ -37,10 +37,17 @@ type enemyStats struct {
 }
 
 var stats = map[enemyKind]enemyStats{
-	crawler: {hp: 3, radius: 9, aggro: 170, speed: 52, cooldown: 0.55, attackLen: 0.36, fireAt: 0.18},
-	spitter: {hp: 6, radius: 10, aggro: 210, speed: 0, cooldown: 2.3, attackLen: 0.45, fireAt: 0.18},
-	drone:   {hp: 5, radius: 9, aggro: 210, speed: 42, cooldown: 2.4, attackLen: 0.36, fireAt: 0.18},
+	crawler: {hp: 4, radius: 9, aggro: 170, speed: 70, cooldown: 0.55, attackLen: 0.36, fireAt: 0.18},
+	spitter: {hp: 6, radius: 10, aggro: 210, speed: 0, cooldown: 2.0, attackLen: 0.45, fireAt: 0.18},
+	drone:   {hp: 7, radius: 9, aggro: 210, speed: 42, cooldown: 2.0, attackLen: 0.36, fireAt: 0.18},
 }
+
+// Enemy shots: how far ahead they aim (seconds of player movement) and laser speed (px/s).
+const (
+	globLead   = 0.7
+	laserLead  = 0.25
+	laserSpeed = 260
+)
 
 // Enemy is any hostile. Pos is the feet (or, for the drone, its shadow).
 type Enemy struct {
@@ -196,7 +203,7 @@ func (g *Game) updateSpitter(e *Enemy, st enemyStats, d float64, los bool) {
 	case stAttack:
 		if !e.Fired && e.T >= st.fireAt {
 			e.Fired = true
-			target := p.Pos.Add(p.Vel.Scale(0.35)) // lead the target a little
+			target := p.Pos.Add(p.Vel.Scale(globLead))
 			if target.Dist(e.Pos) > 240 {
 				target = e.Pos.Add(target.Sub(e.Pos).Norm().Scale(240))
 			}
@@ -247,8 +254,8 @@ func (g *Game) updateDrone(e *Enemy, st enemyStats, d float64, los bool) {
 		if !e.Fired && e.T >= st.fireAt {
 			e.Fired = true
 			from := e.Pos.Add(geom.V(0, 2))
-			aim := p.Pos.Add(p.Vel.Scale(0.12)).Sub(from).Norm()
-			g.shots = append(g.shots, &Shot{Kind: shotLaser, Ground: from, Vel: aim.Scale(215), H: 14, Life: 2})
+			aim := p.Pos.Add(p.Vel.Scale(laserLead)).Sub(from).Norm()
+			g.shots = append(g.shots, &Shot{Kind: shotLaser, Ground: from, Vel: aim.Scale(laserSpeed), H: 14, Life: 2})
 		}
 		if e.T >= st.attackLen {
 			e.setState(stChase)
