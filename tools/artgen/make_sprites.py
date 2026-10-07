@@ -353,7 +353,7 @@ def weapon_rifle():
     put(w, 16, 6, AMB)
     _glove(w, 6, 7)
     return outline(w), {"pivot": [6, 7], "muzzle": [22, 5], "fire_ms": 120, "spread_deg": 3,
-                        "pellets": 1, "recoil_px": 1, "bullet_speed": 420}
+                        "pellets": 1, "recoil_px": 1, "bullet_speed": 420, "damage": 1}
 
 
 def weapon_pistol():
@@ -365,7 +365,8 @@ def weapon_pistol():
     put(w, 11, 5, AMB)
     _glove(w, 6, 7)
     return outline(w), {"pivot": [6, 7], "muzzle": [14, 5], "fire_ms": 260, "spread_deg": 1,
-                        "pellets": 1, "recoil_px": 1, "bullet_speed": 380}
+                        "pellets": 1, "recoil_px": 1, "bullet_speed": 380, "damage": 2,
+                        "semi_auto": True}
 
 
 def weapon_shotgun():
@@ -380,7 +381,7 @@ def weapon_shotgun():
     rect(w, 6, 6, 9, 6, G0)
     _glove(w, 7, 7)
     return outline(w), {"pivot": [7, 7], "muzzle": [22, 5], "fire_ms": 520, "spread_deg": 18,
-                        "pellets": 5, "recoil_px": 3, "bullet_speed": 400}
+                        "pellets": 5, "recoil_px": 3, "bullet_speed": 400, "damage": 1}
 
 
 def weapons():

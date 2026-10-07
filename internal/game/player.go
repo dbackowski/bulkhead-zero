@@ -21,12 +21,6 @@ const (
 // Slot order for keys 1/2/3.
 var weaponOrder = []string{"rifle", "shotgun", "pistol"}
 
-// Damage per bullet/pellet.
-var weaponDamage = map[string]int{"rifle": 1, "shotgun": 1, "pistol": 2}
-
-// Semi-automatic weapons fire once per click.
-var semiAuto = map[string]bool{"pistol": true}
-
 // Player is the marine. Pos is the feet position.
 type Player struct {
 	Pos       geom.Vec
@@ -147,7 +141,7 @@ func (g *Game) updatePlayer(in Input) {
 	// fire
 	w := g.weapons[p.Slot]
 	trigger := in.Fire
-	if semiAuto[w.Name] {
+	if w.SemiAuto {
 		trigger = in.FirePressed
 	}
 	if trigger && p.FireCD <= 0 {
@@ -179,7 +173,7 @@ func (g *Game) fire(w *gfx.Weapon) {
 			Vel:    geom.FromAngle(a).Scale(speed),
 			H:      height,
 			Life:   life,
-			Dmg:    weaponDamage[w.Name],
+			Dmg:    w.Damage,
 			Rot:    a,
 		})
 	}

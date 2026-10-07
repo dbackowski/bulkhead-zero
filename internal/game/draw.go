@@ -9,9 +9,13 @@ import (
 	"github.com/dbackowski/bulkhead-zero/internal/gfx"
 	"github.com/dbackowski/bulkhead-zero/internal/world"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-var voidColor = color.RGBA{18, 20, 28, 255}
+var (
+	voidColor = color.RGBA{18, 20, 28, 255}
+	globMark  = color.RGBA{120, 220, 60, 255}
+)
 
 // renderLevel pre-draws floors, walls and decals into one big image.
 func renderLevel(lib *gfx.Library, l *world.Level) *ebiten.Image {
@@ -59,6 +63,13 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 	dst.DrawImage(g.static, op)
 	for _, s := range g.scorches {
 		gfx.DrawCentered(dst, g.lib.T("decal_scorch"), s.X-cam.X, s.Y-cam.Y, 0)
+	}
+	// acid globs mark where they will land, growing as they fall
+	for _, s := range g.shots {
+		if s.Kind == shotGlob {
+			k := math.Min(s.T/s.Dur, 1)
+			fillEllipse(dst, s.To.Sub(cam), 4+11*k, (4+11*k)*0.55, globMark, 0.25+0.35*k)
+		}
 	}
 
 	// corpses lie under everything that is still alive
@@ -178,4 +189,23 @@ func (g *Game) drawGun(dst *ebiten.Image, cam geom.Vec, alpha float64) {
 	m.Rotate(p.Aim)
 	m.Translate(hand.X-cam.X+0.5, hand.Y-cam.Y+0.5)
 	gfx.DrawWithGeoM(dst, w.Img, m, gfx.SpriteOpts{Alpha: alpha})
+}
+
+// fillEllipse draws a flat ground ellipse (the 3/4 view squashes circles vertically).
+func fillEllipse(dst *ebiten.Image, c geom.Vec, rx, ry float64, clr color.Color, alpha float64) {
+	var path vector.Path
+	for i := 0; i < 16; i++ {
+		a := float64(i) * math.Pi / 8
+		x, y := float32(c.X+rx*math.Cos(a)), float32(c.Y+ry*math.Sin(a))
+		if i == 0 {
+			path.MoveTo(x, y)
+		} else {
+			path.LineTo(x, y)
+		}
+	}
+	path.Close()
+	op := &vector.DrawPathOptions{}
+	op.ColorScale.ScaleWithColor(clr)
+	op.ColorScale.ScaleAlpha(float32(alpha))
+	vector.FillPath(dst, &path, nil, op)
 }

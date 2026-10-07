@@ -347,7 +347,8 @@
       "spread_deg": 3,
       "pellets": 1,
       "recoil_px": 1,
-      "bullet_speed": 420
+      "bullet_speed": 420,
+      "damage": 1
     },
     "pistol": {
       "rect": [
@@ -368,7 +369,9 @@
       "spread_deg": 1,
       "pellets": 1,
       "recoil_px": 1,
-      "bullet_speed": 380
+      "bullet_speed": 380,
+      "damage": 2,
+      "semi_auto": true
     },
     "shotgun": {
       "rect": [
@@ -389,7 +392,8 @@
       "spread_deg": 18,
       "pellets": 5,
       "recoil_px": 3,
-      "bullet_speed": 400
+      "bullet_speed": 400,
+      "damage": 1
     }
   }
 }

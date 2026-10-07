@@ -27,6 +27,8 @@ type WeaponMeta struct {
 	Pellets     int     `json:"pellets"`
 	RecoilPx    float64 `json:"recoil_px"`
 	BulletSpeed float64 `json:"bullet_speed"`
+	Damage      int     `json:"damage"`
+	SemiAuto    bool    `json:"semi_auto"` // fires once per click
 }
 
 // PlayerMeta holds the detached-gun aiming data.

@@ -64,6 +64,8 @@ type Weapon struct {
 	Pellets     int
 	RecoilPx    float64
 	BulletSpeed float64
+	Damage      int
+	SemiAuto    bool
 }
 
 // Library holds every loaded image and animation.
@@ -178,6 +180,8 @@ func Load(fsys fs.FS) (*Library, error) {
 			Pellets:     max(w.Pellets, 1),
 			RecoilPx:    w.RecoilPx,
 			BulletSpeed: w.BulletSpeed,
+			Damage:      max(w.Damage, 1),
+			SemiAuto:    w.SemiAuto,
 		}
 	}
 	for f, a := range sm.Player.HandAnchor {

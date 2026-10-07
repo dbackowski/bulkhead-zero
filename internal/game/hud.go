@@ -32,14 +32,14 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 	p := g.player
 
 	// health pips + weapon box, bottom-left
-	vector.DrawFilledRect(dst, 4, ScreenH-22, 154, 18, hudBg, false)
+	vector.FillRect(dst, 4, ScreenH-22, 154, 18, hudBg, false)
 	vector.StrokeRect(dst, 4, ScreenH-22, 154, 18, 1, hudLine, false)
 	for i := 0; i < playerMaxHP; i++ {
 		c := hpEmpty
 		if i < p.HP {
 			c = hpFull
 		}
-		vector.DrawFilledRect(dst, float32(8+i*6), ScreenH-17, 4, 8, c, false)
+		vector.FillRect(dst, float32(8+i*6), ScreenH-17, 4, 8, c, false)
 	}
 	w := g.weapons[p.Slot]
 	op := &ebiten.DrawImageOptions{}
@@ -65,13 +65,13 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 			printCentered(dst, "WASD MOVE  MOUSE AIM  LMB FIRE\n1-3 / Q / WHEEL WEAPON  ESC PAUSE", 40)
 		}
 	case statePaused:
-		vector.DrawFilledRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
+		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
 		printCentered(dst, "PAUSED\n\nESC TO RESUME   R TO RESTART   F FULLSCREEN", 110)
 	case stateDead:
-		vector.DrawFilledRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
+		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
 		printCentered(dst, "YOU DIED\n\nR OR CLICK TO TRY AGAIN", 110)
 	case stateClear:
-		vector.DrawFilledRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
+		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
 		printCentered(dst, "DECK CLEARED\n\nR OR CLICK TO PLAY AGAIN", 110)
 	}
 }

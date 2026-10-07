@@ -37,7 +37,7 @@ tools/artgen/     make_tiles.py, make_sprites.py, make_preview.py, build.py
 docs/previews/    enlarged sheets + scene.gif / animations.gif / aiming.png for viewing only
 ```
 
-Go code (module `github.com/dbackowski/bulkhead-zero`, Ebitengine **v2.8.9**):
+Go code (module `github.com/dbackowski/bulkhead-zero`, Ebitengine **v2.10**, Go 1.25+):
 
 ```
 main.go                 window setup, runs game.New()
@@ -49,9 +49,6 @@ internal/world          map text format, autotile, collision (MoveAndSlide), lin
 internal/game           Game loop, input, player, enemies (AI + stats table), combat
                         (bullets, enemy shots, barrels), drawing (y-sorted), HUD, devtools
 ```
-
-Ebitengine is pinned to v2.8.9 because v2.9+ needs Go 1.25; upgrade when your Go allows
-(`go get github.com/hajimehoshi/ebiten/v2@latest`).
 
 ## Art pipeline: never hand-edit the PNGs
 
@@ -116,7 +113,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
 6. Bullet spawn = `hand + rotate(muzzle - pivot, aim)`, with the offset's y negated when aiming
    left. Show `muzzle_flash` there.
 7. Weapon stats live next to each weapon in `sprites.json`: `fire_ms`, `spread_deg`, `pellets`,
-   `recoil_px`, `bullet_speed` (px/s). The shotgun fans 5 pellets evenly across its spread.
+   `recoil_px`, `bullet_speed` (px/s), `damage` (per bullet/pellet), `semi_auto` (one shot per
+   click). The shotgun fans 5 pellets evenly across its spread.
 
 ### Gameplay numbers used in the preview sim (starting values, tune freely)
 - Crawler: 3 HP, chases at ~36 px/s, bites at ~15 px range every 0.7 s.
@@ -150,8 +148,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
 - **Enemies** (tuning table `stats` in `internal/game/enemy.go`) sleep until they see the
   player within their aggro range, then wake neighbours within 110 px. Crawlers follow a BFS
   flow field around walls (rebuilt every 0.25 s) and go straight at the player when close;
-  spitters lob acid that leads the player; drones keep 85–140 px away, strafe, fly over props
-  and fire lasers. Crates block bullets and lasers in both directions (cover).
+  spitters lob acid that leads the player (a growing ground marker shows where it lands);
+  drones keep 85–140 px away, strafe, fly over props and fire lasers. Crates block bullets and lasers in both directions (cover).
 - **Explosive barrels** take 3 hits, damage everything within ~44 px and chain to nearby barrels.
 - **Dev tools** (`internal/game/devtools.go`): `BZ_AUTOPILOT=1` lets a bot play;
   `BZ_RECORD=dir BZ_RECORD_SECONDS=30` saves every 3rd frame as PNG and then quits.
@@ -164,7 +162,7 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
 ## Next steps
 
 - **Difficulty tuning.** The autopilot clears the deck in ~30 s losing 1 HP; humans aim worse,
-  but play it and adjust `stats`, `weaponDamage`, HP and invulnerability time.
+  but play it and adjust `stats`, weapon `damage` in `make_sprites.py`, HP and invulnerability time.
 - Real font for the HUD (currently `ebitenutil.DebugPrint`), ammo and reloading, pickups.
 - Sound (Ebitengine `audio` package), muzzle and impact sounds first.
 - Closed doors that open when approached (`door_half` frame exists), more levels, a level
