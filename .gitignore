@@ -1,0 +1,15 @@
+# Go
+/bin/
+/dist/
+/bulkhead-zero
+*.test
+*.out
+
+# Python art tools
+__pycache__/
+*.pyc
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,395 @@
+{
+  "frame_size": 24,
+  "notes": {
+    "origin": "Feet/ground contact is at roughly (12, 21) in every 24x24 frame.",
+    "mirror": "Only *_right facings are drawn. For *_left use the *_right frames flipped horizontally (enemies too).",
+    "fx": "bullet and laser point right; rotate them to the projectile heading.",
+    "loop": "loop=false animations play once, then hold (death) or return to idle."
+  },
+  "player": {
+    "facings": [
+      "right",
+      "down_right",
+      "down",
+      "down_left",
+      "left",
+      "up_left",
+      "up",
+      "up_right"
+    ],
+    "facing_from_aim": "angle = atan2(mouseY - handY, mouseX - handX); facing = facings[round(deg(angle) / 45) mod 8]",
+    "hand_anchor": {
+      "down": [
+        15,
+        14
+      ],
+      "down_right": [
+        15,
+        13
+      ],
+      "right": [
+        13,
+        13
+      ],
+      "up_right": [
+        15,
+        11
+      ],
+      "up": [
+        15,
+        11
+      ],
+      "down_left": [
+        8,
+        13
+      ],
+      "left": [
+        10,
+        13
+      ],
+      "up_left": [
+        8,
+        11
+      ]
+    },
+    "hand_anchor_note": "Gun pivot position inside the body frame; add the current frame's bob to y.",
+    "gun_behind_body": [
+      "up",
+      "up_left",
+      "up_right"
+    ],
+    "weapon_draw": "translate(-pivot) -> if aiming left (cos<0) scale(1,-1) -> rotate(angle) -> translate(hand). Pull back by recoil_px along the aim for ~60ms after a shot.",
+    "muzzle_world": "hand + rotate((muzzle - pivot) with y negated when aiming left, angle)"
+  },
+  "sheets": {
+    "player.png": {
+      "idle_down": {
+        "row": 0,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true,
+        "bob": [
+          0,
+          0,
+          -1,
+          -1
+        ]
+      },
+      "walk_down": {
+        "row": 1,
+        "frames": 4,
+        "frame_ms": 110,
+        "loop": true,
+        "bob": [
+          0,
+          -1,
+          0,
+          -1
+        ]
+      },
+      "hurt_down": {
+        "row": 2,
+        "frames": 2,
+        "frame_ms": 80,
+        "loop": false
+      },
+      "idle_down_right": {
+        "row": 3,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true,
+        "bob": [
+          0,
+          0,
+          -1,
+          -1
+        ]
+      },
+      "walk_down_right": {
+        "row": 4,
+        "frames": 4,
+        "frame_ms": 110,
+        "loop": true,
+        "bob": [
+          0,
+          -1,
+          0,
+          -1
+        ]
+      },
+      "hurt_down_right": {
+        "row": 5,
+        "frames": 2,
+        "frame_ms": 80,
+        "loop": false
+      },
+      "idle_right": {
+        "row": 6,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true,
+        "bob": [
+          0,
+          0,
+          -1,
+          -1
+        ]
+      },
+      "walk_right": {
+        "row": 7,
+        "frames": 4,
+        "frame_ms": 110,
+        "loop": true,
+        "bob": [
+          0,
+          -1,
+          0,
+          -1
+        ]
+      },
+      "hurt_right": {
+        "row": 8,
+        "frames": 2,
+        "frame_ms": 80,
+        "loop": false
+      },
+      "idle_up_right": {
+        "row": 9,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true,
+        "bob": [
+          0,
+          0,
+          -1,
+          -1
+        ]
+      },
+      "walk_up_right": {
+        "row": 10,
+        "frames": 4,
+        "frame_ms": 110,
+        "loop": true,
+        "bob": [
+          0,
+          -1,
+          0,
+          -1
+        ]
+      },
+      "hurt_up_right": {
+        "row": 11,
+        "frames": 2,
+        "frame_ms": 80,
+        "loop": false
+      },
+      "idle_up": {
+        "row": 12,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true,
+        "bob": [
+          0,
+          0,
+          -1,
+          -1
+        ]
+      },
+      "walk_up": {
+        "row": 13,
+        "frames": 4,
+        "frame_ms": 110,
+        "loop": true,
+        "bob": [
+          0,
+          -1,
+          0,
+          -1
+        ]
+      },
+      "hurt_up": {
+        "row": 14,
+        "frames": 2,
+        "frame_ms": 80,
+        "loop": false
+      },
+      "death": {
+        "row": 15,
+        "frames": 6,
+        "frame_ms": 130,
+        "loop": false
+      }
+    },
+    "enemies.png": {
+      "crawler.walk_right": {
+        "row": 0,
+        "frames": 4,
+        "frame_ms": 110,
+        "loop": true
+      },
+      "crawler.attack_right": {
+        "row": 1,
+        "frames": 4,
+        "frame_ms": 90,
+        "loop": false
+      },
+      "crawler.death": {
+        "row": 2,
+        "frames": 4,
+        "frame_ms": 130,
+        "loop": false
+      },
+      "spitter.idle": {
+        "row": 3,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true
+      },
+      "spitter.attack": {
+        "row": 4,
+        "frames": 5,
+        "frame_ms": 90,
+        "loop": false
+      },
+      "spitter.death": {
+        "row": 5,
+        "frames": 4,
+        "frame_ms": 130,
+        "loop": false
+      },
+      "drone.idle": {
+        "row": 6,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true
+      },
+      "drone.attack": {
+        "row": 7,
+        "frames": 4,
+        "frame_ms": 90,
+        "loop": false
+      },
+      "drone.death": {
+        "row": 8,
+        "frames": 4,
+        "frame_ms": 130,
+        "loop": false
+      }
+    },
+    "fx.png": {
+      "bullet": {
+        "row": 0,
+        "frames": 2,
+        "frame_ms": 50,
+        "loop": true
+      },
+      "laser": {
+        "row": 1,
+        "frames": 2,
+        "frame_ms": 50,
+        "loop": true
+      },
+      "hit_spark": {
+        "row": 2,
+        "frames": 3,
+        "frame_ms": 50,
+        "loop": false
+      },
+      "acid_glob": {
+        "row": 3,
+        "frames": 2,
+        "frame_ms": 90,
+        "loop": true
+      },
+      "acid_splash": {
+        "row": 4,
+        "frames": 4,
+        "frame_ms": 80,
+        "loop": false
+      },
+      "explosion": {
+        "row": 5,
+        "frames": 6,
+        "frame_ms": 70,
+        "loop": false
+      },
+      "muzzle_flash": {
+        "row": 6,
+        "frames": 3,
+        "frame_ms": 40,
+        "loop": false
+      },
+      "crosshair": {
+        "row": 7,
+        "frames": 2,
+        "frame_ms": 300,
+        "loop": true
+      }
+    }
+  },
+  "weapons.png": {
+    "rifle": {
+      "rect": [
+        0,
+        0,
+        24,
+        12
+      ],
+      "pivot": [
+        6,
+        7
+      ],
+      "muzzle": [
+        22,
+        5
+      ],
+      "fire_ms": 120,
+      "spread_deg": 3,
+      "pellets": 1,
+      "recoil_px": 1,
+      "bullet_speed": 420
+    },
+    "pistol": {
+      "rect": [
+        0,
+        12,
+        24,
+        12
+      ],
+      "pivot": [
+        6,
+        7
+      ],
+      "muzzle": [
+        14,
+        5
+      ],
+      "fire_ms": 260,
+      "spread_deg": 1,
+      "pellets": 1,
+      "recoil_px": 1,
+      "bullet_speed": 380
+    },
+    "shotgun": {
+      "rect": [
+        0,
+        24,
+        24,
+        12
+      ],
+      "pivot": [
+        7,
+        7
+      ],
+      "muzzle": [
+        22,
+        5
+      ],
+      "fire_ms": 520,
+      "spread_deg": 18,
+      "pellets": 5,
+      "recoil_px": 3,
+      "bullet_speed": 400
+    }
+  }
+}
