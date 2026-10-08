@@ -178,6 +178,7 @@ func (g *Game) fire(w *gfx.Weapon) {
 		})
 	}
 	g.spawnFX("fx.muzzle_flash", muzzle, 0)
+	g.sound(w.Name, muzzle)
 	switch w.Name {
 	case "shotgun":
 		g.shake(2.5, 0.12)

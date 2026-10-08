@@ -66,7 +66,7 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 		}
 	case statePaused:
 		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
-		printCentered(dst, "PAUSED\n\nESC TO RESUME   R TO RESTART   F FULLSCREEN", 110)
+		printCentered(dst, "PAUSED\n\nESC TO RESUME   R TO RESTART   F FULLSCREEN   M MUTE", 110)
 	case stateDead:
 		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
 		printCentered(dst, "YOU DIED\n\nR OR CLICK TO TRY AGAIN", 110)

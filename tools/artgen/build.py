@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate every art asset and preview for Bulkhead Zero.
+"""Regenerate every art and sound asset, and the previews, for Bulkhead Zero.
 
 Usage (from anywhere):
     python3 tools/artgen/build.py            # sheets + JSON + previews
@@ -9,6 +9,7 @@ The three generator scripts write into the current directory, so this runs
 them in a scratch folder and moves each output to its place in the repo:
     assets/tiles/     tileset.png, tiles.json
     assets/sprites/   player.png, weapons.png, enemies.png, fx.png, sprites.json
+    assets/sounds/    <name>_<variant>.wav (make_sfx.py, standard library only)
     docs/previews/    *_x3/x4 sheets, aiming.png, scene.gif, animations.gif
 """
 import os
@@ -42,8 +43,10 @@ def main():
     sys.path.insert(0, str(HERE))
     with tempfile.TemporaryDirectory() as tmp:
         os.chdir(tmp)
+        import make_sfx
         import make_tiles
         import make_sprites
+        make_sfx.main()
         make_tiles.main()
         make_sprites.main()
         if previews:
@@ -52,12 +55,13 @@ def main():
             make_preview.scene()
             make_preview.showcase()
         for name in sorted(os.listdir(tmp)):
-            if name not in DEST:
+            dest = DEST.get(name) or ("assets/sounds" if name.endswith(".wav") else None)
+            if dest is None:
                 continue
-            target = ROOT / DEST[name]
+            target = ROOT / dest
             target.mkdir(parents=True, exist_ok=True)
             shutil.move(os.path.join(tmp, name), target / name)
-            print(f"  {DEST[name]}/{name}")
+            print(f"  {dest}/{name}")
 
 
 if __name__ == "__main__":

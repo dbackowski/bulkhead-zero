@@ -85,6 +85,7 @@ func (g *Game) stepBullet(b *Bullet) bool {
 			if b.Ground.Dist(e.Pos) < stats[e.Kind].radius {
 				g.damageEnemy(e, b.Dmg, b.Ground.Sub(b.Vel))
 				g.spawnFX("fx.hit_spark", visual, 0)
+				g.sound("hit", b.Ground)
 				return false
 			}
 		}
@@ -96,10 +97,12 @@ func (g *Game) stepBullet(b *Bullet) bool {
 				}
 			}
 			g.spawnFX("fx.hit_spark", visual, 0)
+			g.sound("hit", b.Ground)
 			return false
 		}
 		if g.lvl.WallAt(b.Ground) {
 			g.spawnFX("fx.hit_spark", visual, 0)
+			g.sound("hit", b.Ground)
 			return false
 		}
 	}

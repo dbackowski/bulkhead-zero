@@ -5,8 +5,8 @@ WASD to move, mouse to aim (full 360°), click to shoot.
 Go + **Ebitengine v2** (`github.com/hajimehoshi/ebiten/v2`), pixel art at 24×24 per tile/frame.
 
 **Status:** playable prototype. One station level (5 rooms, 17 enemies), the marine with
-360° aiming and three weapons, crawlers / spitters / drones, explosive barrels, HUD, win/lose
-and restart. See "Prototype: what exists" and "Next steps" at the end.
+360° aiming and three weapons, crawlers / spitters / drones, explosive barrels, HUD, gun and
+impact sounds, win/lose and restart. See "Prototype: what exists" and "Next steps" at the end.
 
 ```
 go run .                 # play (macOS: needs Xcode Command Line Tools for cgo)
@@ -33,7 +33,8 @@ python3 tools/artgen/build.py   # regenerate art (see "Art pipeline")
 assets/tiles/     tileset.png (8 cols × 24px), tiles.json (names + autotile rule)
 assets/sprites/   player.png, enemies.png, fx.png (one animation per row, 24×24 frames)
                   weapons.png (24×12 per weapon), sprites.json (all metadata)
-tools/artgen/     make_tiles.py, make_sprites.py, make_preview.py, build.py
+assets/sounds/    <name>_<variant>.wav, 16-bit mono 44.1 kHz (the game picks a random variant)
+tools/artgen/     make_tiles.py, make_sprites.py, make_sfx.py, make_preview.py, build.py
 docs/previews/    enlarged sheets + scene.gif / animations.gif / aiming.png for viewing only
 ```
 
@@ -41,18 +42,18 @@ Go code (module `github.com/dbackowski/bulkhead-zero`, Ebitengine **v2.10**, Go 
 
 ```
 main.go                 window setup, runs game.New()
-assets/assets.go        //go:embed of tiles/ and sprites/
+assets/assets.go        //go:embed of tiles/, sprites/ and sounds/
 internal/geom           Vec (2D math)
 internal/gfx            sprites.json/tiles.json parsing, Library (anims, tiles, weapons), draw helpers
 internal/world          map text format, autotile, collision (MoveAndSlide), line of sight,
                         BFS flow field for enemy pathing; maps.go holds the Station level
 internal/game           Game loop, input, player, enemies (AI + stats table), combat
-                        (bullets, enemy shots, barrels), drawing (y-sorted), HUD, devtools
+                        (bullets, enemy shots, barrels), drawing (y-sorted), HUD, sound (sfx.go), devtools
 ```
 
-## Art pipeline: never hand-edit the PNGs
+## Art pipeline: never hand-edit the PNGs or WAVs
 
-All art comes from code. Change the scripts, then regenerate:
+All art and sound comes from code. Change the scripts, then regenerate:
 
 ```
 pip3 install -r tools/artgen/requirements.txt   # Pillow
@@ -62,6 +63,7 @@ python3 tools/artgen/build.py --no-previews     # just the game assets
 
 `build.py` is deterministic (seeded RNG), so an unchanged script reproduces identical files.
 Check new art by reading the PNGs in `docs/previews/` (look at them, don't just trust the run).
+`make_sfx.py` needs only the standard library; listen to the WAVs, or at least plot them.
 `make_preview.py` also contains a working Python reference of the player compositing and a tiny
 fight simulation; port its logic rather than reinventing it.
 
@@ -138,10 +140,15 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
 ## Prototype: what exists
 
 - **Controls:** WASD/arrows move, mouse aims, LMB fires (rifle and shotgun automatic, pistol
-  semi-auto), 1/2/3, Q or wheel switch weapons, Esc/P pause, R restart, F fullscreen.
+  semi-auto), 1/2/3, Q or wheel switch weapons, Esc/P pause, R restart, F fullscreen,
+  M mute.
 - **Rendering:** 480×270 canvas, window ×3, nearest scaling. The level is pre-rendered once
   (`renderLevel`); props, enemies and the player are y-sorted by feet each frame; corpses
   draw underneath; projectiles and FX on top. Hit flash uses `colorm`.
+- **Sound** (`internal/game/sfx.go`): `g.sound(name, pos)` plays a random variant, quieter
+  with distance from the player (floor 0.15 at 340+ px); repeats of one sound within 40 ms are
+  dropped. Wired so far: weapon shots (named like the weapon) and bullet `hit`. `BZ_MUTE=1`
+  or running under `go test` skips audio entirely (no audio context is created).
 - **Projectiles** keep a *ground* position plus a height `H` they're drawn at. Collisions use
   the ground position (walls, props, enemy radius), which keeps the 3/4 view simple.
   Bullets move in 4 sub-steps per tick.
@@ -170,7 +177,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   handicapped bot now clears in ~40 s with about 4.5/8 HP left and dies in a few % of rounds.
   Most damage comes late (no healing), so pickups are the next lever if it feels harsh.
 - Real font for the HUD (currently `ebitenutil.DebugPrint`), ammo and reloading, pickups.
-- Sound (Ebitengine `audio` package), muzzle and impact sounds first.
+- More sounds in `make_sfx.py`, then one `g.sound` call each: drone laser, spitter spit and
+  acid splash, explosion (barrels, drone death), crawler death, player hurt. Music later.
 - Closed doors that open when approached (`door_half` frame exists), more levels, a level
   format loaded from files, waves or spawners.
 - Possible later mode: turn-based tactics reusing the same tiles and sprites.

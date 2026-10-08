@@ -18,6 +18,7 @@ type Input struct {
 	Restart     bool
 	Pause       bool
 	Fullscreen  bool
+	Mute        bool
 }
 
 func readInput(g *Game) Input {
@@ -56,5 +57,6 @@ func readInput(g *Game) Input {
 		((g.state == stateDead || g.state == stateClear) && g.stateT > 1 && in.FirePressed)
 	in.Pause = inpututil.IsKeyJustPressed(ebiten.KeyEscape) || inpututil.IsKeyJustPressed(ebiten.KeyP)
 	in.Fullscreen = inpututil.IsKeyJustPressed(ebiten.KeyF)
+	in.Mute = inpututil.IsKeyJustPressed(ebiten.KeyM)
 	return in
 }

@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"testing"
 
 	"github.com/dbackowski/bulkhead-zero/assets"
 	"github.com/dbackowski/bulkhead-zero/internal/geom"
@@ -57,6 +58,7 @@ type Game struct {
 	totalFoes  int
 	autopilot  *autopilot
 	recorder   *recorder
+	sfx        *sfx // nil when muted at launch
 	fullscreen bool
 }
 
@@ -84,6 +86,11 @@ func New() (*Game, error) {
 	}
 	if dir := os.Getenv("BZ_RECORD"); dir != "" {
 		g.recorder = newRecorder(dir)
+	}
+	if os.Getenv("BZ_MUTE") == "" && !testing.Testing() {
+		if g.sfx, err = newSFX(assets.FS); err != nil {
+			return nil, err
+		}
 	}
 	if err := g.reset(); err != nil {
 		return nil, err
@@ -127,6 +134,9 @@ func (g *Game) Update() error {
 	if in.Fullscreen {
 		g.fullscreen = !g.fullscreen
 		ebiten.SetFullscreen(g.fullscreen)
+	}
+	if in.Mute && g.sfx != nil {
+		g.sfx.muted = !g.sfx.muted
 	}
 	if in.Restart {
 		return g.reset()
