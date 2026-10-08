@@ -147,7 +147,11 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   draw underneath; projectiles and FX on top. Hit flash uses `colorm`.
 - **Sound** (`internal/game/sfx.go`): `g.sound(name, pos)` plays a random variant, quieter
   with distance from the player (floor 0.15 at 340+ px); repeats of one sound within 40 ms are
-  dropped. Wired so far: weapon shots (named like the weapon) and bullet `hit`. `BZ_MUTE=1`
+  dropped. Wired so far: weapon shots (named like the weapon) and bullet hits: `hit_flesh`
+  (crawler, spitter), `hit_metal` (drone, explosive barrel), `hit_wall` (walls, other props),
+  `hurt` / `player_death`, `<kind>_death` per enemy (`deathSound` in `enemy.go`), `explosion`
+  (barrels), and enemy attacks: `laser` (drone fires), `spit` and `acid_splash` (spitter glob).
+  `hurt` and `player_death` are a voice made by source-filter synthesis (`voice()` in make_sfx.py). `BZ_MUTE=1`
   or running under `go test` skips audio entirely (no audio context is created).
 - **Projectiles** keep a *ground* position plus a height `H` they're drawn at. Collisions use
   the ground position (walls, props, enemy radius), which keeps the 3/4 view simple.
@@ -177,8 +181,7 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   handicapped bot now clears in ~40 s with about 4.5/8 HP left and dies in a few % of rounds.
   Most damage comes late (no healing), so pickups are the next lever if it feels harsh.
 - Real font for the HUD (currently `ebitenutil.DebugPrint`), ammo and reloading, pickups.
-- More sounds in `make_sfx.py`, then one `g.sound` call each: drone laser, spitter spit and
-  acid splash, explosion (barrels, drone death), crawler death, player hurt. Music later.
+- Music. More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call.
 - Closed doors that open when approached (`door_half` frame exists), more levels, a level
   format loaded from files, waves or spawners.
 - Possible later mode: turn-based tactics reusing the same tiles and sprites.

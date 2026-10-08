@@ -208,6 +208,7 @@ func (g *Game) updateSpitter(e *Enemy, st enemyStats, d float64, los bool) {
 				target = e.Pos.Add(target.Sub(e.Pos).Norm().Scale(240))
 			}
 			from := e.Pos.Sub(geom.V(0, 2))
+			g.sound("spit", from)
 			g.shots = append(g.shots, &Shot{
 				Kind: shotGlob, From: from, To: target, Ground: from,
 				Dur: 0.45 + from.Dist(target)/420, H: 12,
@@ -256,6 +257,7 @@ func (g *Game) updateDrone(e *Enemy, st enemyStats, d float64, los bool) {
 			from := e.Pos.Add(geom.V(0, 2))
 			aim := p.Pos.Add(p.Vel.Scale(laserLead)).Sub(from).Norm()
 			g.shots = append(g.shots, &Shot{Kind: shotLaser, Ground: from, Vel: aim.Scale(laserSpeed), H: 14, Life: 2})
+			g.sound("laser", from)
 		}
 		if e.T >= st.attackLen {
 			e.setState(stChase)
@@ -282,12 +284,15 @@ func (g *Game) damageEnemy(e *Enemy, dmg int, from geom.Vec) {
 	if e.HP <= 0 {
 		e.setState(stDead)
 		e.DeadT = 0
+		g.sound(deathSound[e.Kind], e.Pos)
 		if e.Kind == drone {
 			g.spawnFX("fx.explosion", e.Pos.Sub(geom.V(0, 12)), 0)
 			g.shake(2, 0.15)
 		}
 	}
 }
+
+var deathSound = map[enemyKind]string{crawler: "crawler_death", spitter: "spitter_death", drone: "drone_death"}
 
 // flying enemies draw a bit higher and sort by their shadow.
 func (e *Enemy) height() float64 {

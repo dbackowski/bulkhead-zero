@@ -85,24 +85,30 @@ func (g *Game) stepBullet(b *Bullet) bool {
 			if b.Ground.Dist(e.Pos) < stats[e.Kind].radius {
 				g.damageEnemy(e, b.Dmg, b.Ground.Sub(b.Vel))
 				g.spawnFX("fx.hit_spark", visual, 0)
-				g.sound("hit", b.Ground)
+				if e.Kind == drone {
+					g.sound("hit_metal", b.Ground)
+				} else {
+					g.sound("hit_flesh", b.Ground)
+				}
 				return false
 			}
 		}
 		if pr := g.lvl.PropAt(b.Ground); pr != nil {
+			hit := "hit_wall"
 			if pr.Explosive {
+				hit = "hit_metal"
 				pr.HP -= b.Dmg
 				if pr.HP <= 0 {
 					g.explode(pr)
 				}
 			}
 			g.spawnFX("fx.hit_spark", visual, 0)
-			g.sound("hit", b.Ground)
+			g.sound(hit, b.Ground)
 			return false
 		}
 		if g.lvl.WallAt(b.Ground) {
 			g.spawnFX("fx.hit_spark", visual, 0)
-			g.sound("hit", b.Ground)
+			g.sound("hit_wall", b.Ground)
 			return false
 		}
 	}
@@ -140,6 +146,7 @@ func (g *Game) updateShots() {
 			s.H = 12*(1-k) + math.Sin(k*math.Pi)*34
 			if k >= 1 {
 				g.spawnFX("fx.acid_splash", s.To, 0)
+				g.sound("acid_splash", s.To)
 				if !p.Dead && s.To.Dist(p.Pos) < 15 {
 					g.hurtPlayer(2, s.To)
 				}
@@ -164,6 +171,7 @@ func (g *Game) explode(pr *world.Prop) {
 	g.spawnFX("fx.explosion", pr.Center().Add(geom.V(5, -6)), 0)
 	g.scorches = append(g.scorches, pr.Center())
 	g.shake(4, 0.25)
+	g.sound("explosion", c)
 	for _, e := range g.enemies {
 		if e.State != stDead && e.Pos.Dist(c) < 44 {
 			g.damageEnemy(e, 4, c)

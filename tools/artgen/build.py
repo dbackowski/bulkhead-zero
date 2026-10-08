@@ -41,6 +41,8 @@ DEST = {
 def main():
     previews = "--no-previews" not in sys.argv
     sys.path.insert(0, str(HERE))
+    for old in (ROOT / "assets/sounds").glob("*.wav"):  # renamed sounds mustn't linger
+        old.unlink()
     with tempfile.TemporaryDirectory() as tmp:
         os.chdir(tmp)
         import make_sfx

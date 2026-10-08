@@ -202,5 +202,8 @@ func (g *Game) hurtPlayer(dmg int, from geom.Vec) {
 		p.HP = 0
 		p.Dead = true
 		p.DeadT = 0
+		g.sound("player_death", p.Pos)
+		return
 	}
+	g.sound("hurt", p.Pos)
 }

@@ -12,7 +12,12 @@ func TestSoundsExist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range append([]string{"hit"}, weaponOrder...) {
+	names := append([]string{"hit_flesh", "hit_metal", "hit_wall", "hurt", "explosion",
+		"player_death", "laser", "spit", "acid_splash"}, weaponOrder...)
+	for _, n := range deathSound {
+		names = append(names, n)
+	}
+	for _, name := range names {
 		if len(clips[name]) == 0 || len(clips[name][0]) == 0 {
 			t.Errorf("missing sound %q", name)
 		}
