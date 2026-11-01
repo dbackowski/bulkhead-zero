@@ -4,9 +4,10 @@ Top-down sci-fi shooter: a lone marine clears an infested space station.
 WASD to move, mouse to aim (full 360°), click to shoot.
 Go + **Ebitengine v2** (`github.com/hajimehoshi/ebiten/v2`), pixel art at 24×24 per tile/frame.
 
-**Status:** playable prototype. One station level (5 rooms) played as 4 waves and a boss,
-the marine with 360° aiming and six weapons (three unlocked by clearing waves), crawlers /
-spitters / drones / bombers / brutes and the Brood Mother boss, magazines and reloading,
+**Status:** playable prototype. Two station decks (Habitat, Reactor), each played as 4 waves
+and a boss, the marine with 360° aiming and six weapons (three unlocked by clearing waves),
+crawlers / spitters / drones / bombers / brutes, two bosses (the Brood Mother, the Warden),
+magazines and reloading,
 health and ammo pickups, sliding doors, explosive barrels, HUD, sounds, win/lose and restart. See "Prototype: what exists" and "Next steps" at the end.
 
 ```
@@ -33,7 +34,7 @@ python3 tools/artgen/build.py   # regenerate art (see "Art pipeline")
 ```
 assets/tiles/     tileset.png (8 cols × 24px), tiles.json (names + autotile rule)
 assets/sprites/   player.png, enemies.png, fx.png (one animation per row, 24×24 frames)
-                  boss.png (48×48 frames), weapons.png (24×12 per weapon), font.png (HUD
+                  bosses.png (48×48 frames), weapons.png (24×12 per weapon), font.png (HUD
                   font), sprites.json (all metadata)
 assets/sounds/    <name>_<variant>.wav, 16-bit mono 44.1 kHz (the game picks a random variant)
 tools/artgen/     make_tiles.py, make_sprites.py, make_sfx.py, make_preview.py, build.py
@@ -49,7 +50,7 @@ internal/geom           Vec (2D math)
 internal/gfx            sprites.json/tiles.json parsing, Library (anims, tiles, weapons, font),
                         draw helpers, Font (bitmap text)
 internal/world          map text format, autotile, doors, collision (MoveAndSlide), line of sight,
-                        BFS flow field for enemy pathing; maps.go holds the Station level
+                        BFS flow field for enemy pathing; maps.go holds the Station and Reactor maps
 internal/game           Game loop, input, player, enemies (AI + stats table), combat
                         (bullets, enemy shots, blasts), waves.go (waves, boss, doors),
                         drawing (y-sorted), HUD, sound (sfx.go), devtools
@@ -101,7 +102,7 @@ fight simulation; port its logic rather than reinventing it.
   (stationary, lobs acid; the glob should leave on attack frame 2), `drone.idle/attack/death`
   (hovering, shoots a laser; it fires on attack frame 2), `bomber.walk_right/attack_right/death`
   (attack = swelling before it bursts), `brute.walk_right/attack_right/death` (attack frames
-  0-1 wind-up, 2-3 charge), `boss.idle/attack/death` (48×48, in boss.png).
+  0-1 wind-up, 2-3 charge), `brood.idle/attack/death` and `warden.idle/attack/death` (48×48, in bosses.png).
 - FX: `bullet`, `laser`, `plasma`, `grenade`, `spine` (all point right: rotate to the heading),
   `hit_spark`, `acid_glob`, `acid_splash`, `explosion`, `muzzle_flash`, `crosshair`.
 - Font (`font.png`, metadata under `"font.png"`): 5×7 uppercase glyphs (`GLYPHS` in
@@ -165,11 +166,16 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   and 60% ammo (half a full load of spare rounds for every unlocked gun). Walk over to
   collect; one you can't use stays on the floor. They vanish after 25 s, blinking for the
   last 4.
-- **Waves** (`internal/game/waves.go`): wave 1 is the enemies placed in the map; then each
-  string in `stationWaves` (map letters, one per enemy) trickles in through the outer doors
-  away from the player; then the Brood Mother appears at the map's `Q`. Between waves: a 4 s
-  break, +3 HP (full HP before the boss) and the next weapon unlocks (smg, plasma,
-  launcher). Killing the boss kills her brood and clears the deck.
+- **Decks** (`levels` in `internal/game/waves.go`): each has a name, a map, its wave list,
+  its boss (map letter `M` Brood Mother, `W` Warden) and how many weapons it starts with
+  (3, then 6). Beating a deck's boss starts the next deck after 2.5 s with full HP and ammo;
+  dying (or R in the pause menu) retries the current deck from its start; after the last
+  deck the station is clear and R / click starts again from deck 1.
+- **Waves**: wave 1 is the enemies placed in the map; then each string in the deck's
+  `waves` (map letters, one per enemy) trickles in through the outer doors away from the
+  player; then the boss appears at the map's `Q`. Between waves: a 4 s break, +3 HP (full
+  HP before the boss) and the next weapon unlocks (smg, plasma, launcher). Killing a boss
+  kills its minions.
 - **Doors** (`D` in the map, `=` starts open; need floor below): inner doors (floor above too)
   slide open (`door_closed/half/open`, 0.25 s) while the player or an enemy is within 40 px;
   outer doors (wall above) open only for enemies and are where waves come in. A closed door
@@ -200,10 +206,13 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   spitters lob acid that leads the player (a growing ground marker shows where it lands);
   drones keep 85–140 px away, strafe, fly over props and fire lasers; bombers run in, swell
   for 0.5 s and burst (shooting one sets it off, hurting enemies nearby too); brutes (20 HP)
-  wind up and charge in a straight line, stopping at walls. The boss (120 HP) crawls after the
-  player, touching her hurts, and cycles a ring of slow spines, an acid barrage and
-  summoning crawlers; below half HP she is faster and each attack is bigger. Crates block
-  bullets, lasers and spines in both directions (cover).
+  wind up and charge in a straight line, stopping at walls. Bosses (`updateBoss`) hurt on
+  contact and get faster with bigger attacks below half HP. The Brood Mother (120 HP)
+  crawls after the player and cycles a ring of slow spines, an acid barrage and summoning
+  crawlers. The Warden (80 HP, 2.4 s between attacks) hovers 60–100 px away and cycles a
+  slow fan of 3 lasers, mortar shells (an orange ground marker shows the blast; they hurt
+  enemies too) and deploying drones. Crates block bullets, lasers and spines in both
+  directions (cover).
 - **Explosive barrels** take 3 hits, damage everything within ~44 px and chain to nearby barrels
   (`blast` in combat.go, shared with bombers and grenades).
 - **Dev tools** (`internal/game/devtools.go`): `BZ_AUTOPILOT=1` lets a bot play
@@ -214,24 +223,32 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   golden data, collision, line of sight, flow-field following, metadata completeness,
   facing sectors, doors, the wave → boss → clear flow, reloading, pickups, and full rounds
   played by the autopilot
-  (clear, death, restart, barrel chains). `TestDifficulty` plays 20 seeded full games (all
-  waves and the boss) with the handicapped bot and fails if it clears under half of them or
-  keeps over 75% HP on average; run it with `-v` while tuning.
-  Keep `TestStationIsConnected` passing when editing the map.
+  (clear, death, restart, barrel chains), and walking through every wave of both decks.
+  `TestDifficulty` plays 20 seeded games of each deck (all waves and the boss) with the
+  handicapped bot and fails if it beats the boss in under half of them or keeps over 75% HP
+  on average; run it with `-v` while tuning. `TestMapsAreConnected` checks every map:
+  everything reachable, a boss spot, outer doors that open onto floor.
 
 ## Next steps
 
 - **Difficulty: play-test it.** Tuned against the bots only: player 8 HP and 0.45 s
   invulnerability; crawlers 4 HP at 70 px/s; drones 7 HP; ranged cooldowns 2.0 s; shots lead
   the player (`globLead`, `laserLead`, `laserSpeed` in `enemy.go`). With waves and the boss
-  and then reloading and pickups (November 2026) the handicapped bot clears 11/20 games in
-  ~150 s, ending with ~4.1/8 HP; most of its deaths are to the boss. Reload time was the
-  biggest lever (1.2 s rifle reloads dropped it to 2/20). The bot only uses
-  rifle/shotgun/pistol, finishes reloads before switching and picks up drops when nothing is
-  in sight. Levers: `stationWaves`, boss `hp`, `waveHeal`, `reload_ms`, `dropChance`.
+  and then reloading and pickups (November 2026) the handicapped bot beats deck 1 in 11/20
+  games (~4.6/8 HP left) and deck 2 in 10/20 (~4.0/8), in ~150 s each; most deaths are to
+  the bosses. Reload time was the biggest lever (1.2 s rifle reloads dropped deck 1 to
+  2/20); for the Warden it was its attack rate (2.0 s → 3/20, 2.4 s → 10/20). Explosive
+  barrels on the bot's routes and enemies covering an entrance also cost a lot: keep them
+  off the main paths when editing maps. The bot uses rifle/shotgun/pistol, the smg once
+  unlocked and plasma against the Warden, finishes reloads before switching, and picks up
+  drops when nothing is in sight. Levers: each deck's `waves`, boss `hp` and `cooldown`,
+  `waveHeal`, `reload_ms`, `dropChance`.
 - Destructible crates that drop pickups; ammo is plentiful for the bot, so `dropChance`
   and `ammo` could tighten if it never feels scarce.
 - Music. More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call.
-- More levels (each with its own wave list), a level format loaded from files.
-  `docs/previews/gameplay.gif` predates waves and doors; re-record it.
+- More decks: a map in `maps.go` (keep `TestMapsAreConnected` passing) plus an entry in
+  `levels`; a new boss is a kind, a stats entry, an attack function and a bosses.png row.
+  The Reactor map was laid out by a small script (rooms, openings and props as
+  coordinates) rather than typed by hand, which avoids off-by-one columns.
+- `docs/previews/gameplay.gif` predates waves and doors; re-record it.
 - Possible later mode: turn-based tactics reusing the same tiles and sprites.

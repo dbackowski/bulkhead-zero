@@ -426,6 +426,33 @@ def dry_fire(rng, v):
     return finish(mix(click, knock))
 
 
+def warden_alarm(rng, v):
+    """The Warden powers up: a two-tone klaxon over a low servo hum."""
+    n = int(1.3 * RATE)
+    hi, lo = 740 + 20 * v, 520 + 15 * v
+    pitch = lambda t: hi if int(t / 0.22) % 2 == 0 else lo
+    klaxon = drive(fm(n, pitch, 7, 0.01, 99), 4.0)
+    klaxon = [x * min(1.0, i / (0.03 * RATE)) * (1 if i / RATE < 1.1 else 0) for i, x in enumerate(klaxon)]
+    hum = scale(fm(n, sweep(55, 75, 0.4), 4, 0.05, 1.0), 0.6)
+    return finish(reverb(mix(scale(biquad(klaxon, "lp", 2600), 0.6), hum), 0.3, size=1.4), fade=0.1)
+
+
+def warden_death(rng, v):
+    """The mech fails: a power-down whine, sparking, then a heavy blast."""
+    n = int(2.2 * RATE)
+    whine = tone(n, sweep(1200 + 60 * v, 60, 0.5), 0.8)
+    whine = [x * (1.0 if int(i / RATE * 22) % 3 else 0.2) for i, x in enumerate(whine)]
+    sparks = [0.0] * n
+    for _ in range(30):
+        i = int(rng.uniform(0, 0.8) * RATE)
+        for j in range(int(0.006 * RATE)):
+            if i + j < n:
+                sparks[i + j] += rng.uniform(-1, 1) * math.exp(-j / (0.0015 * RATE))
+    blast = delayed(boom(rng, n, 0.2, 0.5, 0.8, 3.0), 0.7)
+    return finish(reverb(mix(scale(biquad(whine, "lp", 3000), 0.4), scale(biquad(sparks, "hp", 2000), 0.5), blast),
+                         0.35, size=1.5, decay=0.84), fade=0.3)
+
+
 # name: (generator(rng, variant) -> samples, loudness). Loudness is the RMS of
 # the loudest 50 ms above 200 Hz, i.e. roughly how loud it sounds on laptop
 # speakers, so these numbers compare directly; peaks are capped at 0.9.
@@ -460,6 +487,8 @@ SOUNDS = {
     "pickup": (pickup_sfx, 0.12),
     "reload": (reload_sfx, 0.10),
     "dry_fire": (dry_fire, 0.08),
+    "warden_alarm": (warden_alarm, 0.22),
+    "warden_death": (warden_death, 0.30),
 }
 
 

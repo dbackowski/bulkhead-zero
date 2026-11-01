@@ -8,15 +8,27 @@ import (
 	"github.com/dbackowski/bulkhead-zero/internal/world"
 )
 
-// Wave 1 is the enemies placed in the map. These come after it, in through
-// the outer doors, one letter per enemy (map letters: C crawler, R drone,
-// E bomber, G brute; spitters don't walk, so they stay map-only). The boss
-// follows the last wave.
-var stationWaves = []string{
-	"CCCCCCEE",
-	"CCCCRRGEE",
-	"CCCCCRRRGGEEE",
+// level is one deck of the station. Wave 1 is the enemies placed in the map;
+// waves lists the ones after it, which come in through the outer doors, one
+// letter per enemy (map letters: C crawler, R drone, E bomber, G brute;
+// spitters don't walk, so they stay map-only). The boss appears at the map's
+// Q after the last wave; beating it moves on to the next deck.
+type level struct {
+	name     string
+	rows     []string
+	waves    []string
+	boss     byte // M Brood Mother, W Warden
+	unlocked int  // weapons available when the deck starts
 }
+
+var levels = []level{
+	{"DECK 1: HABITAT", world.Station, []string{"CCCCCCEE", "CCCCRRGEE", "CCCCCRRRGGEEE"}, 'M', 3},
+	{"DECK 2: REACTOR", world.Reactor, []string{"CCCRREE", "CCCRRGEE", "CCCCRRRGGEE"}, 'W', 6},
+}
+
+var bossName = map[enemyKind]string{brood: "BROOD MOTHER", warden: "THE WARDEN"}
+
+func (g *Game) deck() level { return levels[g.level] }
 
 const (
 	waveBreak = 4.0  // seconds between waves
@@ -26,13 +38,14 @@ const (
 	doorTime  = 0.25 // seconds to slide fully open or shut
 )
 
-func (g *Game) waveCount() int { return 1 + len(stationWaves) }
+func (g *Game) waveCount() int { return 1 + len(g.deck().waves) }
 
 // updateWaves trickles in the current wave, then after a short break starts
-// the next one, then the boss. The deck is clear once the boss is dead.
-func (g *Game) updateWaves() {
+// the next one, then the boss. Once the boss is dead the next deck starts, or
+// after the last deck the station is clear.
+func (g *Game) updateWaves() error {
 	if g.player.Dead {
-		return
+		return nil
 	}
 	if len(g.queue) > 0 {
 		if g.spawnT -= dt; g.spawnT <= 0 {
@@ -40,16 +53,21 @@ func (g *Game) updateWaves() {
 			g.queue = g.queue[1:]
 			g.spawnT = spawnGap
 		}
-		return
+		return nil
 	}
 	if g.boss != nil {
-		if g.boss.State == stDead && g.boss.DeadT > 2.5 {
+		switch {
+		case g.boss.State != stDead || g.boss.DeadT < 2.5:
+		case g.level+1 < len(levels):
+			g.level++
+			return g.reset()
+		default:
 			g.state, g.stateT = stateClear, 0
 		}
-		return
+		return nil
 	}
 	if g.aliveFoes() > 0 {
-		return
+		return nil
 	}
 	if g.nextIn <= 0 { // the wave was just cleared
 		g.waveCleared()
@@ -58,6 +76,7 @@ func (g *Game) updateWaves() {
 	if g.nextIn -= dt; g.nextIn <= 0 {
 		g.startWave()
 	}
+	return nil
 }
 
 func (g *Game) waveCleared() {
@@ -78,17 +97,17 @@ func (g *Game) waveCleared() {
 func (g *Game) startWave() {
 	g.wave++
 	if g.wave <= g.waveCount() {
-		g.queue = []byte(stationWaves[g.wave-2])
+		g.queue = []byte(g.deck().waves[g.wave-2])
 		g.totalFoes = len(g.queue)
 		g.say(fmt.Sprintf("WAVE %d", g.wave), 2)
 		return
 	}
-	g.boss = g.spawnHunter('Q', g.lvl.Boss)
+	g.boss = g.spawnHunter(g.deck().boss, g.lvl.Boss)
 	g.boss.CD = 2
 	g.totalFoes = 1
 	g.shake(5, 0.6)
-	g.sound("boss_roar", g.boss.Pos)
-	g.say("WARNING\nBROOD MOTHER", 3)
+	g.sound(map[enemyKind]string{brood: "boss_roar", warden: "warden_alarm"}[g.boss.Kind], g.boss.Pos)
+	g.say("WARNING\n"+bossName[g.boss.Kind], 3)
 }
 
 // spawnHunter adds an enemy that is already hunting the player.

@@ -1,5 +1,5 @@
-// Package game is the playable prototype: one station level fought in waves
-// ending with a boss, the marine, five enemy types, weapons, camera and HUD.
+// Package game is the playable prototype: two station decks, each fought in
+// waves ending with a boss, the marine, five enemy types, weapons, camera and HUD.
 package game
 
 import (
@@ -56,6 +56,7 @@ type Game struct {
 	t          float64
 	stateT     float64
 	state      state
+	level      int // index into levels
 	totalFoes  int // in the current wave
 	kills      int
 	wave       int    // 1 = the enemies placed in the map
@@ -109,8 +110,10 @@ func New() (*Game, error) {
 	return g, nil
 }
 
+// reset starts the current deck afresh: full health and ammo, and the
+// weapons the deck starts with.
 func (g *Game) reset() error {
-	lvl, err := world.Parse(world.Station)
+	lvl, err := world.Parse(g.deck().rows)
 	if err != nil {
 		return err
 	}
@@ -123,9 +126,10 @@ func (g *Game) reset() error {
 	}
 	g.totalFoes, g.kills = len(g.enemies), 0
 	g.wave, g.queue, g.nextIn, g.boss, g.banner, g.bannerT = 1, nil, 0, nil, "", 0
-	g.unlocked = min(3, len(g.weapons))
+	g.unlocked = min(g.deck().unlocked, len(g.weapons))
 	g.bullets, g.shots, g.fx, g.scorches, g.blasts, g.pickups = nil, nil, nil, nil, nil, nil
 	g.state, g.stateT, g.t = statePlaying, 0, 0
+	g.say(g.deck().name, 3)
 	g.flow = lvl.DistanceField(g.player.Pos)
 	g.cam = g.cameraTarget(geom.V(ScreenW/2, ScreenH/2))
 	return nil
@@ -151,6 +155,9 @@ func (g *Game) Update() error {
 		g.sfx.muted = !g.sfx.muted
 	}
 	if in.Restart {
+		if g.state == stateClear {
+			g.level = 0 // won: play from the start; died or paused: retry this deck
+		}
 		return g.reset()
 	}
 	if in.Pause && (g.state == statePlaying || g.state == statePaused) {
@@ -181,7 +188,9 @@ func (g *Game) Update() error {
 	g.updateDoors()
 	g.bannerT -= dt
 	if g.state == statePlaying {
-		g.updateWaves()
+		if err := g.updateWaves(); err != nil {
+			return err
+		}
 	}
 	g.updateBullets()
 	g.updateShots()

@@ -97,6 +97,12 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	case math.Mod(a.t, 24) > 20:
 		slot = 2
 	}
+	if slot == 0 && g.unlocked > 3 {
+		slot = 3 // the smg out-damages the rifle
+	}
+	if slot == 3 && g.unlocked > 4 && vis != nil && vis.Kind == warden {
+		slot = 4 // plasma: accurate at the range the Warden keeps
+	}
 	if p.ReloadT > 0 {
 		slot = p.Slot // switching would throw the reload away
 	}
@@ -136,7 +142,7 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 
 	// movement: back off from close melee enemies, strafe while shooting,
 	// otherwise grab pickups, otherwise hunt
-	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, boss: 60}
+	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, brood: 60}
 	switch {
 	case vis != nil && (dv < backOff[vis.Kind]):
 		in.Move = p.Pos.Sub(vis.Pos).Norm().Add(geom.V(math.Sin(a.t*2), 0).Scale(0.6))

@@ -126,6 +126,7 @@ func sub(img *ebiten.Image, x, y, w, h int) *ebiten.Image {
 var sheetPrefix = map[string]string{
 	"player.png":  "player.",
 	"enemies.png": "", // rows are already named "crawler.walk_right" etc.
+	"bosses.png":  "", // "brood.idle", "warden.attack", ...
 	"fx.png":      "fx.",
 }
 

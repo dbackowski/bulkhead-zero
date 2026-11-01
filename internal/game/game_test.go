@@ -81,10 +81,16 @@ func TestBarrelChainReaction(t *testing.T) {
 	}
 }
 
-// Difficulty guard-rail: the handicapped autopilot (shaky aim, slow reactions)
-// should usually clear the deck, but not without getting hurt. Run with -v to
-// see the numbers when tuning stats, HP or invulnerability.
+// Difficulty guard-rail: on every deck the handicapped autopilot (shaky aim,
+// slow reactions) should usually beat the boss, but not without getting hurt.
+// Run with -v to see the numbers when tuning.
 func TestDifficulty(t *testing.T) {
+	for lvl := range levels {
+		t.Run(levels[lvl].name, func(t *testing.T) { checkDifficulty(t, lvl) })
+	}
+}
+
+func checkDifficulty(t *testing.T, lvl int) {
 	const rounds = 20
 	clears, hpLeft := 0, 0
 	for seed := int64(1); seed <= rounds; seed++ {
@@ -93,20 +99,25 @@ func TestDifficulty(t *testing.T) {
 			t.Fatal(err)
 		}
 		g.rng = rand.New(rand.NewSource(seed))
+		g.level = lvl
 		if err := g.reset(); err != nil {
 			t.Fatal(err)
 		}
 		g.autopilot = newHumanAutopilot()
-		for i := 0; i < 60*420 && g.state == statePlaying && !g.player.Dead; i++ {
+		bossHP := -1
+		for i := 0; i < 60*420 && g.level == lvl && g.state == statePlaying && !g.player.Dead; i++ {
+			hp := g.player.HP
 			if err := g.Update(); err != nil {
 				t.Fatal(err)
 			}
+			if g.level != lvl || g.state == stateClear { // beat the boss: the next deck just started
+				clears++
+				hpLeft += hp
+			} else if g.boss != nil {
+				bossHP = g.boss.HP
+			}
 		}
-		if g.state == stateClear {
-			clears++
-			hpLeft += g.player.HP
-		}
-		t.Logf("seed %2d: state=%d wave=%d boss HP=%d time=%.0fs hp=%d", seed, g.state, g.wave, bossHealth(g), g.t, g.player.HP)
+		t.Logf("seed %2d: wave=%d boss HP=%d time=%.0fs dead=%v", seed, g.wave, bossHP, g.t, g.player.Dead)
 	}
 	t.Logf("cleared %d/%d, avg HP left %.1f/%d", clears, rounds, float64(hpLeft)/float64(max(clears, 1)), playerMaxHP)
 	if clears < rounds/2 {
@@ -117,23 +128,17 @@ func TestDifficulty(t *testing.T) {
 	}
 }
 
-func bossHealth(g *Game) int {
-	if g.boss == nil {
-		return -1
-	}
-	return g.boss.HP
-}
-
-// Killing everything walks through every wave (unlocking weapons and healing
-// between them) to the boss, and killing the boss clears the deck.
+// Killing everything walks through every wave of every deck (unlocking
+// weapons and healing between waves) to its boss; beating a boss starts the
+// next deck, and beating the last one clears the station.
 func TestWavesThenBoss(t *testing.T) {
 	g, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	g.player.Invuln = 1e9
 	step := func(secs float64) {
 		for i := 0; i < int(secs*60); i++ {
+			g.player.Invuln = 1
 			if err := g.Update(); err != nil {
 				t.Fatal(err)
 			}
@@ -146,27 +151,32 @@ func TestWavesThenBoss(t *testing.T) {
 			}
 		}
 	}
-	for w := 1; w <= g.waveCount(); w++ {
-		if g.wave != w {
-			t.Fatalf("expected wave %d, got %d", w, g.wave)
+	for lvl, deck := range levels {
+		if g.level != lvl || g.state != statePlaying {
+			t.Fatalf("expected to be playing deck %d, at %d in state %d", lvl+1, g.level+1, g.state)
+		}
+		for w := 1; w <= g.waveCount(); w++ {
+			if g.wave != w {
+				t.Fatalf("deck %d: expected wave %d, got %d", lvl+1, w, g.wave)
+			}
+			killAll()
+			step(waveBreak + 0.1)
+			if want := min(deck.unlocked+w, len(g.weapons)); g.unlocked != want {
+				t.Fatalf("deck %d after wave %d: %d weapons unlocked, want %d", lvl+1, w, g.unlocked, want)
+			}
+			step(spawnGap * 20) // let the next wave come in through the doors
+			if w < g.waveCount() && g.aliveFoes() != len(deck.waves[w-1]) {
+				t.Fatalf("deck %d wave %d: %d enemies in, want %d", lvl+1, w+1, g.aliveFoes(), len(deck.waves[w-1]))
+			}
+		}
+		if g.boss == nil || g.boss.State == stDead || g.boss.Kind != kindFor[deck.boss] {
+			t.Fatalf("deck %d: its boss should be out after the last wave", lvl+1)
 		}
 		killAll()
-		step(waveBreak + 0.1)
-		if want := min(3+w, len(g.weapons)); g.unlocked != want {
-			t.Fatalf("after wave %d: %d weapons unlocked, want %d", w, g.unlocked, want)
-		}
-		step(spawnGap * 20) // let the next wave come in through the doors
-		if w < g.waveCount() && g.aliveFoes() != len(stationWaves[w-1]) {
-			t.Fatalf("wave %d: %d enemies in, want %d", w+1, g.aliveFoes(), len(stationWaves[w-1]))
-		}
+		step(3)
 	}
-	if g.boss == nil || g.boss.State == stDead {
-		t.Fatal("the boss should be out after the last wave")
-	}
-	killAll()
-	step(3)
 	if g.state != stateClear {
-		t.Fatalf("expected the deck to be clear after the boss, state %d", g.state)
+		t.Fatalf("expected the station to be clear after the last boss, state %d", g.state)
 	}
 }
 

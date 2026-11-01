@@ -16,11 +16,15 @@ const (
 	drone
 	bomber // runs at the player and bursts
 	brute  // slow and tough, charges
-	boss   // the Brood Mother, after the last wave
+	brood  // boss of deck 1, the Brood Mother
+	warden // boss of deck 2, a security mech
 )
 
-// Map letters for each kind (see world/level.go), also used by the wave lists.
-var kindFor = map[byte]enemyKind{'C': crawler, 'S': spitter, 'R': drone, 'E': bomber, 'G': brute, 'Q': boss}
+// Map letters for each kind (see world/level.go), also used by the wave
+// lists; the bosses' letters are only used by the level list.
+var kindFor = map[byte]enemyKind{'C': crawler, 'S': spitter, 'R': drone, 'E': bomber, 'G': brute, 'M': brood, 'W': warden}
+
+func (e *Enemy) isBoss() bool { return e.Kind == brood || e.Kind == warden }
 
 type enemyState int
 
@@ -49,8 +53,9 @@ var stats = map[enemyKind]enemyStats{
 	// bomber: attackLen is the fuse once it is next to the player
 	bomber: {hp: 2, radius: 8, aggro: 170, speed: 62, attackLen: 0.5},
 	// brute: winds up until fireAt, then charges until attackLen
-	brute: {hp: 20, radius: 11, aggro: 190, speed: 30, cooldown: 2.4, attackLen: 1.15, fireAt: 0.55},
-	boss:  {hp: 120, radius: 17, aggro: 999, speed: 24, cooldown: 1.6, attackLen: 0.7, fireAt: 0.35},
+	brute:  {hp: 20, radius: 11, aggro: 190, speed: 30, cooldown: 2.4, attackLen: 1.15, fireAt: 0.55},
+	brood:  {hp: 120, radius: 17, aggro: 999, speed: 24, cooldown: 1.6, attackLen: 0.7, fireAt: 0.35},
+	warden: {hp: 80, radius: 16, aggro: 999, speed: 22, cooldown: 2.4, attackLen: 0.8, fireAt: 0.3},
 }
 
 // Enemy shots: how far ahead they aim (seconds of player movement) and laser speed (px/s).
@@ -61,7 +66,10 @@ const (
 
 	bomberBlast = 40.0  // px
 	bruteCharge = 200.0 // px/s
-	spineSpeed  = 150.0 // the boss's spines are slow enough to weave through
+	spineSpeed  = 150.0 // the Brood Mother's spines are slow enough to weave through
+	mortarBlast = 30.0  // px, the Warden's shells
+	fanSpeed    = 190.0 // the Warden's laser fan: slower than a drone's shot
+	fanGap      = 0.24  // radians between its bolts
 )
 
 // Enemy is any hostile. Pos is the feet (or, for the drone, its shadow).
@@ -161,7 +169,7 @@ func (g *Game) updateEnemy(e *Enemy) {
 		g.updateBomber(e, st, d, los)
 	case brute:
 		g.updateBrute(e, st, d, los)
-	case boss:
+	case brood, warden:
 		g.updateBoss(e, st, d, los)
 	}
 }
@@ -268,9 +276,10 @@ func (g *Game) updateBrute(e *Enemy, st enemyStats, d float64, los bool) {
 	}
 }
 
-// updateBoss: the Brood Mother crawls after the player and cycles through a
-// ring of spines, an acid barrage and summoning her brood. Below half health
-// she is faster and every attack is bigger.
+// updateBoss runs either boss. The Brood Mother crawls after the player and
+// cycles a ring of spines, an acid barrage and summoning her brood. The
+// Warden keeps its distance and cycles a fan of lasers, mortar shells and
+// deploying drones. Below half health both are faster and every attack is bigger.
 func (g *Game) updateBoss(e *Enemy, st enemyStats, d float64, los bool) {
 	enraged := e.HP*2 < st.hp
 	if d < 22 {
@@ -280,7 +289,11 @@ func (g *Game) updateBoss(e *Enemy, st enemyStats, d float64, los bool) {
 	case stAttack:
 		if !e.Fired && e.T >= st.fireAt {
 			e.Fired = true
-			g.bossAttack(e, enraged)
+			if e.Kind == warden {
+				g.wardenAttack(e, enraged)
+			} else {
+				g.broodAttack(e, enraged)
+			}
 		}
 		if e.T >= st.attackLen {
 			e.setState(stChase)
@@ -294,16 +307,68 @@ func (g *Game) updateBoss(e *Enemy, st enemyStats, d float64, los bool) {
 		if enraged {
 			speed *= 1.4
 		}
-		if d > 40 {
-			e.Pos = g.lvl.MoveAndSlide(e.Pos, g.chaseDir(e, los, d).Scale(speed*dt), 8, 5, false)
+		dir := g.chaseDir(e, los, d)
+		switch {
+		case e.Kind == warden && los && d < 60:
+			dir = e.Pos.Sub(g.player.Pos).Norm() // back off
+		case e.Kind == warden && los && d < 100, e.Kind == brood && d <= 40:
+			dir = geom.Vec{} // close enough
 		}
+		e.Pos = g.lvl.MoveAndSlide(e.Pos, dir.Scale(speed*dt), 8, 5, false)
 		if e.CD <= 0 && los {
 			e.setState(stAttack)
 		}
 	}
 }
 
-func (g *Game) bossAttack(e *Enemy, enraged bool) {
+func (g *Game) wardenAttack(e *Enemy, enraged bool) {
+	p := g.player
+	from := e.Pos.Sub(geom.V(0, 4))
+	pattern := e.Pattern % 3
+	e.Pattern++
+	if pattern == 2 && g.aliveFoes() > 6 {
+		pattern = 0 // enough drones out already
+	}
+	switch pattern {
+	case 0: // a fan of lasers at the player
+		n := 3
+		if enraged {
+			n = 5
+		}
+		aim := p.Pos.Sub(from).Angle()
+		for i := 0; i < n; i++ {
+			a := aim + (float64(i)-float64(n-1)/2)*fanGap
+			g.shots = append(g.shots, &Shot{Kind: shotLaser, Ground: from, Vel: geom.FromAngle(a).Scale(fanSpeed), H: 22, Life: 2.5})
+		}
+		g.sound("laser", from)
+	case 1: // mortar shells that burst where they land (marked on the floor)
+		n := 2
+		if enraged {
+			n = 4
+		}
+		for i := 0; i < n; i++ {
+			to := p.Pos.Add(p.Vel.Scale(globLead)).Add(geom.FromAngle(g.rng.Float64() * 2 * math.Pi).Scale(float64(i) * 26))
+			g.shots = append(g.shots, &Shot{Kind: shotMortar, From: from, To: to, Ground: from,
+				Dur: 0.8 + from.Dist(to)/450 + float64(i)*0.12, H: 22})
+		}
+		g.sound("launcher", from)
+	case 2: // deploy drones
+		n := 2
+		if enraged {
+			n = 3
+		}
+		for i := 0; i < n; i++ {
+			pos := e.Pos.Add(geom.V(float64(i*2-n+1)*14, -6))
+			if g.lvl.RectBlocked(pos, 4, 3, true) {
+				pos = e.Pos
+			}
+			g.spawnHunter('R', pos)
+		}
+		g.sound("warden_alarm", from)
+	}
+}
+
+func (g *Game) broodAttack(e *Enemy, enraged bool) {
 	p := g.player
 	from := e.Pos.Sub(geom.V(0, 4))
 	pattern := e.Pattern % 3
@@ -451,14 +516,15 @@ func (g *Game) kill(e *Enemy) {
 		g.shake(2, 0.15)
 	case bomber:
 		g.blast(e.Pos, bomberBlast, 3)
-	case boss:
+	case brood, warden:
+		g.say(bossName[e.Kind]+" DOWN", 2.5)
 		for i := 0; i < 6; i++ {
 			off := geom.FromAngle(float64(i) * 1.1).Scale(float64(6 + i*3))
 			g.fx = append(g.fx, &FX{Anim: g.lib.A("fx.explosion"), Pos: e.Pos.Sub(geom.V(0, 18)).Add(off), T: -0.12 * float64(i)})
 		}
 		g.shake(6, 0.8)
 		g.shots = nil
-		for _, o := range g.enemies { // her brood dies with her
+		for _, o := range g.enemies { // its minions die with it
 			if o.State != stDead {
 				o.setState(stDead)
 				o.DeadT = 0
@@ -468,15 +534,17 @@ func (g *Game) kill(e *Enemy) {
 }
 
 var deathSound = map[enemyKind]string{crawler: "crawler_death", spitter: "spitter_death", drone: "drone_death",
-	bomber: "explosion", brute: "brute_death", boss: "boss_death"}
+	bomber: "explosion", brute: "brute_death", brood: "boss_death", warden: "warden_death"}
 
 // height is how far above the feet an enemy's body centre is (for aiming).
 func (e *Enemy) height() float64 {
 	switch e.Kind {
 	case drone:
 		return 12
-	case boss:
+	case brood:
 		return 20
+	case warden:
+		return 22
 	}
 	return 7
 }

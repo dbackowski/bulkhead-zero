@@ -75,13 +75,13 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 
 	// wave and hostiles, top-left; the boss gets a health bar instead
 	if b := g.boss; b != nil {
-		name := "BROOD MOTHER"
+		name := bossName[b.Kind]
 		f.Draw(dst, name, (ScreenW-f.Width(name, 1))/2, 5, 1, textAmber)
 		vector.FillRect(dst, ScreenW/2-80, 16, 160, 6, hpEmpty, false)
-		vector.FillRect(dst, ScreenW/2-80, 16, 160*float32(max(b.HP, 0))/float32(stats[boss].hp), 6, bossHP, false)
+		vector.FillRect(dst, ScreenW/2-80, 16, 160*float32(max(b.HP, 0))/float32(stats[b.Kind].hp), 6, bossHP, false)
 		vector.StrokeRect(dst, ScreenW/2-81, 15, 162, 8, 1, hudLine, false)
 	} else {
-		f.Draw(dst, fmt.Sprintf("WAVE %d/%d", g.wave, g.waveCount()), 5, 5, 1, textAmber)
+		f.Draw(dst, fmt.Sprintf("DECK %d  WAVE %d/%d", g.level+1, g.wave, g.waveCount()), 5, 5, 1, textAmber)
 		f.Draw(dst, fmt.Sprintf("HOSTILES %d/%d", g.aliveFoes()+len(g.queue), g.totalFoes), 5, 15, 1, textDim)
 	}
 	if g.state == statePlaying && g.bannerT > 0 {
@@ -121,6 +121,6 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 		g.printCentered(dst, "YOU DIED\n\nR OR CLICK TO TRY AGAIN", 110, textRed)
 	case stateClear:
 		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
-		g.printCentered(dst, "DECK CLEARED\nTHE BROOD MOTHER IS DEAD\n\nR OR CLICK TO PLAY AGAIN", 110, textGreen)
+		g.printCentered(dst, "STATION CLEARED\nBOTH DECKS ARE SAFE\n\nR OR CLICK TO PLAY AGAIN", 110, textGreen)
 	}
 }

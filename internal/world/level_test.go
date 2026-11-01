@@ -60,9 +60,34 @@ func TestDoorsBlockUntilOpen(t *testing.T) {
 }
 
 // Every enemy must be able to reach the player and vice versa, and every floor
-// tile should be reachable (catches walled-off rooms when editing the map).
-func TestStationIsConnected(t *testing.T) {
-	l := station(t)
+// tile should be reachable (catches walled-off rooms when editing a map).
+// Every map needs a boss spot and outer doors for the waves.
+func TestMapsAreConnected(t *testing.T) {
+	for name, rows := range map[string][]string{"Station": Station, "Reactor": Reactor} {
+		t.Run(name, func(t *testing.T) { checkConnected(t, rows) })
+	}
+}
+
+func checkConnected(t *testing.T, rows []string) {
+	l, err := Parse(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Boss == (geom.Vec{}) || l.RectBlocked(l.Boss, 8, 5, false) {
+		t.Errorf("bad boss spot %v", l.Boss)
+	}
+	outer := 0
+	for _, d := range l.Doors {
+		if !d.Inner {
+			outer++
+			if l.SolidAt(d.Center().Add(geom.V(0, T)), false) {
+				t.Errorf("outer door %d,%d opens onto something solid", d.TX, d.TY)
+			}
+		}
+	}
+	if outer == 0 {
+		t.Error("no outer doors for waves to come in through")
+	}
 	field := l.DistanceField(l.Start)
 	for _, s := range l.Spawns {
 		tx, ty := int(s.Pos.X/T), int(s.Pos.Y/T)

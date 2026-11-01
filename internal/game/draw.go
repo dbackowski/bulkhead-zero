@@ -15,6 +15,7 @@ import (
 var (
 	voidColor = color.RGBA{18, 20, 28, 255}
 	globMark  = color.RGBA{120, 220, 60, 255}
+	shellMark = color.RGBA{238, 90, 40, 255}
 )
 
 // renderLevel pre-draws floors, walls and decals into one big image.
@@ -81,11 +82,15 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 	for _, s := range g.scorches {
 		gfx.DrawCentered(dst, g.lib.T("decal_scorch"), s.X-cam.X, s.Y-cam.Y, 0)
 	}
-	// acid globs mark where they will land, growing as they fall
+	// acid globs and mortar shells mark where they will land, growing as they fall
 	for _, s := range g.shots {
-		if s.Kind == shotGlob {
-			k := math.Min(s.T/s.Dur, 1)
+		k := math.Min(s.T/s.Dur, 1)
+		switch s.Kind {
+		case shotGlob:
 			fillEllipse(dst, s.To.Sub(cam), 4+11*k, (4+11*k)*0.55, globMark, 0.25+0.35*k)
+		case shotMortar:
+			r := mortarBlast - 6 // where it hurts the player
+			fillEllipse(dst, s.To.Sub(cam), r*(0.3+0.7*k), r*(0.3+0.7*k)*0.55, shellMark, 0.2+0.35*k)
 		}
 	}
 
@@ -138,6 +143,8 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 			gfx.DrawCentered(dst, g.lib.A("fx.spine").Frame(g.t), v.X, v.Y, s.Vel.Angle())
 		case shotGlob:
 			gfx.DrawCentered(dst, g.lib.A("fx.acid_glob").Frame(s.T), v.X, v.Y, 0)
+		case shotMortar:
+			gfx.DrawCentered(dst, g.lib.A("fx.grenade").Frame(s.T), v.X, v.Y, 0)
 		}
 	}
 	for _, f := range g.fx {
@@ -149,7 +156,7 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 }
 
 var enemyAnim = map[enemyKind]string{crawler: "crawler", spitter: "spitter", drone: "drone",
-	bomber: "bomber", brute: "brute", boss: "boss"}
+	bomber: "bomber", brute: "brute", brood: "brood", warden: "warden"}
 
 func (g *Game) drawEnemy(dst *ebiten.Image, e *Enemy, cam geom.Vec) {
 	// side-on enemies only have *_right frames, mirrored for left

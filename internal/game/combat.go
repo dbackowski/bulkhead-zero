@@ -30,7 +30,8 @@ type shotKind int
 const (
 	shotLaser shotKind = iota
 	shotGlob
-	shotSpine // the boss's; flies straight like a laser
+	shotSpine  // the Brood Mother's; flies straight like a laser
+	shotMortar // the Warden's; arcs like a glob and explodes
 )
 
 // Shot is an enemy projectile: a straight laser, or an acid glob lobbed in an arc.
@@ -159,12 +160,15 @@ func (g *Game) updateShots() {
 			if s.Life <= 0 {
 				s.dead = true
 			}
-		case shotGlob:
+		case shotGlob, shotMortar:
 			s.T += dt
 			k := math.Min(s.T/s.Dur, 1)
 			s.Ground = s.From.Lerp(s.To, k)
 			s.H = 12*(1-k) + math.Sin(k*math.Pi)*34
-			if k >= 1 {
+			if k >= 1 && s.Kind == shotMortar {
+				g.blast(s.To, mortarBlast, 3)
+				s.dead = true
+			} else if k >= 1 {
 				g.spawnFX("fx.acid_splash", s.To, 0)
 				g.sound("acid_splash", s.To)
 				if !p.Dead && s.To.Dist(p.Pos) < 15 {

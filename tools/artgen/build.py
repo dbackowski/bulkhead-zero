@@ -8,7 +8,7 @@ Usage (from anywhere):
 The three generator scripts write into the current directory, so this runs
 them in a scratch folder and moves each output to its place in the repo:
     assets/tiles/     tileset.png, tiles.json
-    assets/sprites/   player.png, weapons.png, enemies.png, fx.png, boss.png, font.png, sprites.json
+    assets/sprites/   player.png, weapons.png, enemies.png, fx.png, bosses.png, font.png, sprites.json
     assets/sounds/    <name>_<variant>.wav (make_sfx.py, standard library only)
     docs/previews/    *_x3/x4 sheets, aiming.png, scene.gif, animations.gif
 """
@@ -28,7 +28,7 @@ DEST = {
     "weapons.png": "assets/sprites",
     "enemies.png": "assets/sprites",
     "fx.png": "assets/sprites",
-    "boss.png": "assets/sprites",
+    "bosses.png": "assets/sprites",
     "font.png": "assets/sprites",
     "sprites.json": "assets/sprites",
     "tileset_x4.png": "docs/previews",

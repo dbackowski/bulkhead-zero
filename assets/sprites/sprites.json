@@ -392,23 +392,44 @@
         "loop": true
       }
     },
-    "boss.png": {
-      "idle": {
+    "bosses.png": {
+      "brood.idle": {
         "row": 0,
         "frames": 4,
         "frame_ms": 180,
         "loop": true,
         "size": 48
       },
-      "attack": {
+      "brood.attack": {
         "row": 1,
         "frames": 4,
         "frame_ms": 90,
         "loop": false,
         "size": 48
       },
-      "death": {
+      "brood.death": {
         "row": 2,
+        "frames": 6,
+        "frame_ms": 130,
+        "loop": false,
+        "size": 48
+      },
+      "warden.idle": {
+        "row": 3,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true,
+        "size": 48
+      },
+      "warden.attack": {
+        "row": 4,
+        "frames": 4,
+        "frame_ms": 90,
+        "loop": false,
+        "size": 48
+      },
+      "warden.death": {
+        "row": 5,
         "frames": 6,
         "frame_ms": 130,
         "loop": false,

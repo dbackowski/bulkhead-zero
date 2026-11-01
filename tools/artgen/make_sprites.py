@@ -887,6 +887,78 @@ def boss_anims():
 
 
 # ============================================================================
+# BOSS 2 - Warden, a security mech guarding the reactor. 48x48, faces the camera.
+# ============================================================================
+def warden(bob=0, step=0, visor=0, cannons=0, tilt=0, wreck=False):
+    img = new(B, B)
+    ty = 13 + bob                                                       # torso top
+    for lx, k in ((15, step), (29, -step)):                            # legs
+        rect(img, lx, ty + 17, lx + 4, 42 + min(k, 0), G0)
+        rect(img, lx + 1, ty + 17, lx + 3, 40 + min(k, 0), G1)
+        rect(img, lx - 2, 42 + min(k, 0), lx + 6, 44 + min(k, 0), G1)   # feet
+        rect(img, lx - 2, 42 + min(k, 0), lx + 6, 42 + min(k, 0), G2)
+        put(img, lx + 2, ty + 24, AMB)                                  # knee light
+    rect(img, 13, ty + 15, 35, ty + 18, G0)                              # hips
+    rect(img, 10, ty, 38, ty + 15, G1)                                   # torso
+    rect(img, 10, ty, 38, ty + 1, G2)
+    rect(img, 11, ty, 37, ty, G3)
+    rect(img, 10, ty + 13, 38, ty + 15, G0)
+    for px in (10, 38):
+        put(img, px, ty, CLEAR)
+    rect(img, 15, ty + 7, 33, ty + 12, G2)                               # chest plate
+    rect(img, 15, ty + 7, 33, ty + 7, G3)
+    rect(img, 24, ty + 7, 24, ty + 12, G1)
+    for hx in range(13, 36):                              # hazard band on the hips
+        rect(img, hx, ty + 15, hx, ty + 17, AMB if (hx // 2) % 2 else U0)
+    vc = [RED_D, RED, FLASH2][visor]                                     # visor bar
+    rect(img, 16, ty + 3, 32, ty + 5, U0)
+    rect(img, 17, ty + 4, 31, ty + 4, vc)
+    if visor:
+        put(img, 18 + (visor * 5) % 12, ty + 4, WHITE)
+    for cx, sgn in ((3, -1), (39, 1)):                                   # shoulder cannons
+        rect(img, cx, ty - 3, cx + 6, ty + 8, G1)
+        rect(img, cx, ty - 3, cx + 6, ty - 2, G2)
+        rect(img, cx + 1, ty + 1, cx + 5, ty + 2, AMB)                  # warning stripe
+        put(img, cx + 3, ty + 1, AMB_D)
+        rect(img, cx + 1, ty + 9, cx + 5, ty + 11, G0)                  # muzzles
+        mc = [U0, RED, FLASH1][cannons]
+        rect(img, cx + 2, ty + 10, cx + 4, ty + 11, mc)
+    rect(img, 23, ty - 5, 24, ty - 1, G2)                                # antenna
+    put(img, 23, ty - 6, RED if visor else RED_D)
+    out = outline(img)
+    if wreck:
+        rng = random.Random(5)
+        for _ in range(40):                                              # scorch and holes
+            put(out, rng.randint(10, 38), rng.randint(ty, ty + 18), rng.choice([U0, G0, (60, 60, 64, 255)]))
+    if tilt:
+        out = out.rotate(-tilt, resample=Image.NEAREST, center=(24, 44))
+    return out
+
+
+def warden_anims():
+    a = {}
+    a["idle"] = [boss_shadow(warden(bob=b, step=s, visor=v), rx=15)
+                 for b, s, v in ((0, 0, 0), (1, 1, 1), (0, 0, 0), (1, -1, 1))]
+    a["attack"] = [boss_shadow(warden(visor=v, cannons=c, bob=b), rx=15)
+                   for v, c, b in ((1, 1, 0), (2, 2, -1), (2, 2, -1), (1, 1, 0))]
+    smoke = (60, 60, 64, 200)
+    dead = []
+    for i, (tilt, drop) in enumerate(((0, 0), (6, 0), (14, 2), (24, 5), (24, 5), (24, 5))):
+        spr = warden(visor=0, wreck=i >= 2, tilt=tilt)
+        if i == 0:
+            spr = tint(spr, WHITE, .85)
+        spr = shift(spr, 0, drop)
+        if 1 <= i <= 3:
+            flash_star(spr, 16 + i * 5, 18 + i * 2, 2)
+        if i >= 3:
+            for k in range(6):
+                put(spr, 18 + k * 2, 12 - k % 2 + i, smoke)
+        dead.append(boss_shadow(spr, rx=16))
+    a["death"] = dead
+    return a
+
+
+# ============================================================================
 # FX - projectiles and impacts (game rotates bullets/lasers to their heading)
 # ============================================================================
 def fx_anims():
@@ -1080,6 +1152,7 @@ def build_all():
         "bomber": bomber_anims(),
         "brute": brute_anims(),
         "boss": boss_anims(),
+        "warden": warden_anims(),
         "fx": fx,
     }
 
@@ -1128,7 +1201,7 @@ def main():
                                                   ("drone.", all_["drone"]),
                                                   ("bomber.", all_["bomber"]),
                                                   ("brute.", all_["brute"])])
-    b_sheet, b_meta = write_sheet("boss.png", [("", all_["boss"])], size=B)
+    b_sheet, b_meta = write_sheet("bosses.png", [("brood.", all_["boss"]), ("warden.", all_["warden"])], size=B)
     t_sheet, t_meta = font_sheet()
     t_sheet.save("font.png")
     f_sheet, f_meta = write_sheet("fx.png", [("", all_["fx"])])
@@ -1150,7 +1223,7 @@ def main():
                 "weapon_draw": "translate(-pivot) -> if aiming left (cos<0) scale(1,-1) -> rotate(angle) -> translate(hand). Pull back by recoil_px along the aim for ~60ms after a shot.",
                 "muzzle_world": "hand + rotate((muzzle - pivot) with y negated when aiming left, angle)",
             },
-            "sheets": {"player.png": p_meta, "enemies.png": e_meta, "fx.png": f_meta, "boss.png": b_meta},
+            "sheets": {"player.png": p_meta, "enemies.png": e_meta, "fx.png": f_meta, "bosses.png": b_meta},
             "weapons.png": w_meta,
             "font.png": t_meta,
         }, f, indent=2)
