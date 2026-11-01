@@ -16,14 +16,31 @@ import (
 
 const sampleRate = 44100
 
-// sfx plays the generated sound effects (assets/sounds, see tools/artgen/make_sfx.py).
+// sfx plays the generated sound effects (assets/sounds, see tools/artgen/make_sfx.py)
+// and music loops (assets/music, make_music.py).
 type sfx struct {
 	ctx   *audio.Context
 	clips map[string][][]byte // name -> decoded PCM of each variant
 	last  map[string]float64  // game time each sound last started
 	live  []*audio.Player     // held so playing sounds aren't garbage collected
+	music map[string]*track
 	muted bool
 }
+
+// track is one music loop and its current fade level (0..1).
+type track struct {
+	p   *audio.Player
+	vol float64
+}
+
+// Music loops, assets/music/music_<name>.wav.
+var musicTracks = []string{"calm", "combat", "boss"}
+
+const (
+	musicVolume  = 0.45 // under the sound effects
+	musicFade    = 1.5  // seconds for a crossfade
+	combatLinger = 5.0  // seconds combat music outlasts the last hunter: longer than a wave break, so it carries through
+)
 
 // loadClips decodes sounds/<name>_<variant>.wav into PCM, grouped by name.
 func loadClips(fsys fs.FS) (map[string][][]byte, error) {
@@ -63,7 +80,83 @@ func newSFX(fsys fs.FS) (*sfx, error) {
 	if ctx == nil {
 		ctx = audio.NewContext(sampleRate)
 	}
-	return &sfx{ctx: ctx, clips: clips, last: map[string]float64{}}, nil
+	s := &sfx{ctx: ctx, clips: clips, last: map[string]float64{}, music: map[string]*track{}}
+	for _, name := range musicTracks {
+		b, err := fs.ReadFile(fsys, "music/music_"+name+".wav")
+		if err != nil {
+			return nil, err
+		}
+		st, err := wav.DecodeWithSampleRate(sampleRate, bytes.NewReader(b))
+		if err != nil {
+			return nil, err
+		}
+		p, err := ctx.NewPlayer(audio.NewInfiniteLoop(st, st.Length()))
+		if err != nil {
+			return nil, err
+		}
+		s.music[name] = &track{p: p}
+	}
+	return s, nil
+}
+
+// musicTrack picks the loop for the moment: the boss theme while a boss is
+// alive, combat while enemies are hunting the player (and for a few seconds
+// after), calm otherwise.
+func (g *Game) musicTrack() string {
+	switch {
+	case g.state == stateDead || g.state == stateClear:
+		return "calm"
+	case g.boss != nil && g.boss.State != stDead:
+		return "boss"
+	case g.fightT > 0:
+		return "combat"
+	}
+	return "calm"
+}
+
+// updateFight keeps fightT topped up while a wave is coming in or any enemy
+// is awake and hunting.
+func (g *Game) updateFight() {
+	hunted := len(g.queue) > 0
+	for _, e := range g.enemies {
+		hunted = hunted || e.Aggro && e.State != stDead
+	}
+	if hunted {
+		g.fightT = combatLinger
+	} else {
+		g.fightT -= dt
+	}
+}
+
+// updateMusic crossfades toward the wanted loop. A loop that fades in starts
+// from its beginning; it is quieter while paused and silent when muted.
+func (g *Game) updateMusic() {
+	s := g.sfx
+	if s == nil {
+		return
+	}
+	want, gain := g.musicTrack(), musicVolume
+	if s.muted {
+		gain = 0
+	} else if g.state == statePaused {
+		gain *= 0.4
+	}
+	for name, tr := range s.music {
+		step := dt / musicFade
+		if name == want {
+			tr.vol = math.Min(tr.vol+step, 1)
+		} else {
+			tr.vol = math.Max(tr.vol-step, 0)
+		}
+		tr.p.SetVolume(tr.vol * gain)
+		switch {
+		case tr.vol > 0 && !tr.p.IsPlaying():
+			_ = tr.p.Rewind()
+			tr.p.Play()
+		case tr.vol == 0 && tr.p.IsPlaying():
+			tr.p.Pause()
+		}
+	}
 }
 
 // sound plays a random variant of name, quieter the farther at is from the

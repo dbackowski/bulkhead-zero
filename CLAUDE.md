@@ -8,7 +8,7 @@ Go + **Ebitengine v2** (`github.com/hajimehoshi/ebiten/v2`), pixel art at 24×24
 and a boss, the marine with 360° aiming and six weapons (three unlocked by clearing waves),
 crawlers / spitters / drones / bombers / brutes, two bosses (the Brood Mother, the Warden),
 magazines and reloading,
-health and ammo pickups, sliding doors, explosive barrels, HUD, sounds, win/lose and restart. See "Prototype: what exists" and "Next steps" at the end.
+health and ammo pickups, sliding doors, explosive barrels, HUD, sounds, music, win/lose and restart. See "Prototype: what exists" and "Next steps" at the end.
 
 ```
 go run .                 # play (macOS: needs Xcode Command Line Tools for cgo)
@@ -37,7 +37,8 @@ assets/sprites/   player.png, enemies.png, fx.png (one animation per row, 24×24
                   bosses.png (48×48 frames), weapons.png (24×12 per weapon), font.png (HUD
                   font), sprites.json (all metadata)
 assets/sounds/    <name>_<variant>.wav, 16-bit mono 44.1 kHz (the game picks a random variant)
-tools/artgen/     make_tiles.py, make_sprites.py, make_sfx.py, make_preview.py, build.py
+assets/music/     music_<name>.wav loops, 16-bit mono 22.05 kHz
+tools/artgen/     make_tiles.py, make_sprites.py, make_sfx.py, make_music.py, make_preview.py, build.py
 docs/previews/    enlarged sheets + scene.gif / animations.gif / aiming.png for viewing only
 ```
 
@@ -45,7 +46,7 @@ Go code (module `github.com/dbackowski/bulkhead-zero`, Ebitengine **v2.10**, Go 
 
 ```
 main.go                 window setup, runs game.New()
-assets/assets.go        //go:embed of tiles/, sprites/ and sounds/
+assets/assets.go        //go:embed of tiles/, sprites/, sounds/ and music/
 internal/geom           Vec (2D math)
 internal/gfx            sprites.json/tiles.json parsing, Library (anims, tiles, weapons, font),
                         draw helpers, Font (bitmap text)
@@ -62,13 +63,21 @@ All art and sound comes from code. Change the scripts, then regenerate:
 
 ```
 pip3 install -r tools/artgen/requirements.txt   # Pillow
-python3 tools/artgen/build.py                   # sheets + JSON + previews (~10 s)
+python3 tools/artgen/build.py                   # sheets + JSON + sounds + music + previews (~50 s)
 python3 tools/artgen/build.py --no-previews     # just the game assets
 ```
 
 `build.py` is deterministic (seeded RNG), so an unchanged script reproduces identical files.
 Check new art by reading the PNGs in `docs/previews/` (look at them, don't just trust the run).
 `make_sfx.py` needs only the standard library; listen to the WAVs, or at least plot them.
+`make_music.py` (standard library, reuses make_sfx's synth helpers) composes the loops in code:
+each track is a `Track` with drum, bass, pad and lead parts, mixed by target loudness per
+part (`mixdown` levels) then gently limited; the render's tail is folded onto its start so
+it loops without a seam. It renders at 44.1 kHz and writes 22.05 kHz to keep files small
+(~1.2 MB each). It takes most of the build time (~30 s). When changing it, plot the result:
+a solid wall of waveform means the mix is clipping.
+`build.py` deletes old WAVs only after everything generated, so a failed run leaves the
+assets alone.
 `make_preview.py` also contains a working Python reference of the player compositing and a tiny
 fight simulation; port its logic rather than reinventing it.
 
@@ -197,6 +206,12 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   `spit` and `acid_splash` (spitter glob), `spine` (boss ring).
   `hurt` and `player_death` are a voice made by source-filter synthesis (`voice()` in make_sfx.py). `BZ_MUTE=1`
   or running under `go test` skips audio entirely (no audio context is created).
+- **Music** (`sfx.go`, `musicTrack`/`updateMusic`): three loops, `calm` (exploring, between
+  fights, death and win screens), `combat` (while a wave is coming in or any enemy is awake,
+  lingering 5 s after, longer than a wave break so it carries through) and `boss` (while a
+  boss lives). Switching crossfades over 1.5 s and a loop that fades in starts from its
+  beginning. Music sits at 0.45 volume under the effects, drops to 40% while paused, and
+  M mutes it with everything else.
 - **Projectiles** keep a *ground* position plus a height `H` they're drawn at. Collisions use
   the ground position (walls, props, enemy radius), which keeps the 3/4 view simple.
   Bullets move in 4 sub-steps per tick.
@@ -221,7 +236,7 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   `docs/previews/gameplay.gif` was made that way.
 - **Tests:** world parsing/connectivity (every spawn reachable), autotile vs the Python
   golden data, collision, line of sight, flow-field following, metadata completeness,
-  facing sectors, doors, the wave → boss → clear flow, reloading, pickups, and full rounds
+  facing sectors, doors, the wave → boss → clear flow, reloading, pickups, music choice, and full rounds
   played by the autopilot
   (clear, death, restart, barrel chains), and walking through every wave of both decks.
   `TestDifficulty` plays 20 seeded games of each deck (all waves and the boss) with the
@@ -245,7 +260,9 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   `waveHeal`, `reload_ms`, `dropChance`.
 - Destructible crates that drop pickups; ammo is plentiful for the bot, so `dropChance`
   and `ammo` could tighten if it never feels scarce.
-- Music. More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call.
+- More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call. Music per
+  deck (e.g. the Reactor transposed or with its own lead) would be new `TRACKS` entries
+  plus a deck field choosing them; stingers for wave start, death and victory.
 - More decks: a map in `maps.go` (keep `TestMapsAreConnected` passing) plus an entry in
   `levels`; a new boss is a kind, a stats entry, an attack function and a bosses.png row.
   The Reactor map was laid out by a small script (rooms, openings and props as

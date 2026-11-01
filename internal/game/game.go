@@ -63,6 +63,7 @@ type Game struct {
 	queue      []byte // enemies of this wave still to come in
 	spawnT     float64
 	nextIn     float64 // countdown to the next wave
+	fightT     float64 // > 0 while the combat music should play
 	boss       *Enemy
 	unlocked   int // weapons available (slots 0..unlocked-1)
 	banner     string
@@ -125,7 +126,7 @@ func (g *Game) reset() error {
 		g.enemies = append(g.enemies, newEnemy(s, g.rng))
 	}
 	g.totalFoes, g.kills = len(g.enemies), 0
-	g.wave, g.queue, g.nextIn, g.boss, g.banner, g.bannerT = 1, nil, 0, nil, "", 0
+	g.wave, g.queue, g.nextIn, g.boss, g.banner, g.bannerT, g.fightT = 1, nil, 0, nil, "", 0, 0
 	g.unlocked = min(g.deck().unlocked, len(g.weapons))
 	g.bullets, g.shots, g.fx, g.scorches, g.blasts, g.pickups = nil, nil, nil, nil, nil, nil
 	g.state, g.stateT, g.t = statePlaying, 0, 0
@@ -169,6 +170,7 @@ func (g *Game) Update() error {
 			ebiten.SetCursorMode(ebiten.CursorModeHidden)
 		}
 	}
+	g.updateMusic()
 	if g.state == statePaused {
 		return nil
 	}
@@ -186,6 +188,7 @@ func (g *Game) Update() error {
 		g.updateEnemy(e)
 	}
 	g.updateDoors()
+	g.updateFight()
 	g.bannerT -= dt
 	if g.state == statePlaying {
 		if err := g.updateWaves(); err != nil {

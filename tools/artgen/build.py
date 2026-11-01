@@ -10,6 +10,7 @@ them in a scratch folder and moves each output to its place in the repo:
     assets/tiles/     tileset.png, tiles.json
     assets/sprites/   player.png, weapons.png, enemies.png, fx.png, bosses.png, font.png, sprites.json
     assets/sounds/    <name>_<variant>.wav (make_sfx.py, standard library only)
+    assets/music/     music_<name>.wav loops (make_music.py, standard library only)
     docs/previews/    *_x3/x4 sheets, aiming.png, scene.gif, animations.gif
 """
 import os
@@ -43,14 +44,14 @@ DEST = {
 def main():
     previews = "--no-previews" not in sys.argv
     sys.path.insert(0, str(HERE))
-    for old in (ROOT / "assets/sounds").glob("*.wav"):  # renamed sounds mustn't linger
-        old.unlink()
     with tempfile.TemporaryDirectory() as tmp:
         os.chdir(tmp)
         import make_sfx
+        import make_music
         import make_tiles
         import make_sprites
         make_sfx.main()
+        make_music.main()
         make_tiles.main()
         make_sprites.main()
         if previews:
@@ -58,8 +59,13 @@ def main():
             make_preview.aiming_sheet()
             make_preview.scene()
             make_preview.showcase()
+        # everything generated fine: now drop old WAVs so renamed sounds don't linger
+        for old in [*(ROOT / "assets/sounds").glob("*.wav"), *(ROOT / "assets/music").glob("*.wav")]:
+            old.unlink()
         for name in sorted(os.listdir(tmp)):
-            dest = DEST.get(name) or ("assets/sounds" if name.endswith(".wav") else None)
+            dest = DEST.get(name)
+            if dest is None and name.endswith(".wav"):
+                dest = "assets/music" if name.startswith("music_") else "assets/sounds"
             if dest is None:
                 continue
             target = ROOT / dest
