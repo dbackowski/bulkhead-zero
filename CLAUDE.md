@@ -4,9 +4,10 @@ Top-down sci-fi shooter: a lone marine clears an infested space station.
 WASD to move, mouse to aim (full 360°), click to shoot.
 Go + **Ebitengine v2** (`github.com/hajimehoshi/ebiten/v2`), pixel art at 24×24 per tile/frame.
 
-**Status:** playable prototype. One station level (5 rooms, 17 enemies), the marine with
-360° aiming and three weapons, crawlers / spitters / drones, explosive barrels, HUD, gun and
-impact sounds, win/lose and restart. See "Prototype: what exists" and "Next steps" at the end.
+**Status:** playable prototype. One station level (5 rooms) played as 4 waves and a boss,
+the marine with 360° aiming and six weapons (three unlocked by clearing waves), crawlers /
+spitters / drones / bombers / brutes and the Brood Mother boss, sliding doors, explosive
+barrels, HUD, sounds, win/lose and restart. See "Prototype: what exists" and "Next steps" at the end.
 
 ```
 go run .                 # play (macOS: needs Xcode Command Line Tools for cgo)
@@ -32,7 +33,7 @@ python3 tools/artgen/build.py   # regenerate art (see "Art pipeline")
 ```
 assets/tiles/     tileset.png (8 cols × 24px), tiles.json (names + autotile rule)
 assets/sprites/   player.png, enemies.png, fx.png (one animation per row, 24×24 frames)
-                  weapons.png (24×12 per weapon), sprites.json (all metadata)
+                  boss.png (48×48 frames), weapons.png (24×12 per weapon), sprites.json (all metadata)
 assets/sounds/    <name>_<variant>.wav, 16-bit mono 44.1 kHz (the game picks a random variant)
 tools/artgen/     make_tiles.py, make_sprites.py, make_sfx.py, make_preview.py, build.py
 docs/previews/    enlarged sheets + scene.gif / animations.gif / aiming.png for viewing only
@@ -45,10 +46,11 @@ main.go                 window setup, runs game.New()
 assets/assets.go        //go:embed of tiles/, sprites/ and sounds/
 internal/geom           Vec (2D math)
 internal/gfx            sprites.json/tiles.json parsing, Library (anims, tiles, weapons), draw helpers
-internal/world          map text format, autotile, collision (MoveAndSlide), line of sight,
+internal/world          map text format, autotile, doors, collision (MoveAndSlide), line of sight,
                         BFS flow field for enemy pathing; maps.go holds the Station level
 internal/game           Game loop, input, player, enemies (AI + stats table), combat
-                        (bullets, enemy shots, barrels), drawing (y-sorted), HUD, sound (sfx.go), devtools
+                        (bullets, enemy shots, blasts), waves.go (waves, boss, doors),
+                        drawing (y-sorted), HUD, sound (sfx.go), devtools
 ```
 
 ## Art pipeline: never hand-edit the PNGs or WAVs
@@ -87,17 +89,19 @@ fight simulation; port its logic rather than reinventing it.
 
 ### Sprites (`assets/sprites/sprites.json`)
 - `sheets.<file>.<anim>` gives `row`, `frames`, `frame_ms`, `loop` (and `bob` for player
-  idle/walk). Frame `n` of an animation is at `(n*24, row*24)`.
+  idle/walk, `size` when frames aren't 24). Frame `n` is at `(n*size, row*size)`.
 - Every 24×24 frame has its **feet / ground contact at about (12, 21)**: anchor entities there and
-  y-sort by feet.
+  y-sort by feet. Bigger frames follow the same rule, `(size/2, size-3)` (the boss: (24, 45)).
 - Only `*_right` facings are drawn; **left = the right frames flipped horizontally**
-  (player diagonals and the crawler too). Spitter and drone face the camera and are not flipped.
+  (player diagonals, crawler, bomber and brute too). Spitter, drone and boss face the camera.
 - `loop: false` animations play once, then hold the last frame (death) or return to idle.
 - Enemies: `crawler.walk_right/attack_right/death` (fast melee), `spitter.idle/attack/death`
   (stationary, lobs acid; the glob should leave on attack frame 2), `drone.idle/attack/death`
-  (hovering, shoots a laser; it fires on attack frame 2).
-- FX: `bullet`, `laser` (both point right: rotate to the heading), `hit_spark`, `acid_glob`,
-  `acid_splash`, `explosion`, `muzzle_flash`, `crosshair`.
+  (hovering, shoots a laser; it fires on attack frame 2), `bomber.walk_right/attack_right/death`
+  (attack = swelling before it bursts), `brute.walk_right/attack_right/death` (attack frames
+  0-1 wind-up, 2-3 charge), `boss.idle/attack/death` (48×48, in boss.png).
+- FX: `bullet`, `laser`, `plasma`, `grenade`, `spine` (all point right: rotate to the heading),
+  `hit_spark`, `acid_glob`, `acid_splash`, `explosion`, `muzzle_flash`, `crosshair`.
 
 ### Player compositing (the important part)
 Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
@@ -116,7 +120,10 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
    left. Show `muzzle_flash` there.
 7. Weapon stats live next to each weapon in `sprites.json`: `fire_ms`, `spread_deg`, `pellets`,
    `recoil_px`, `bullet_speed` (px/s), `damage` (per bullet/pellet), `semi_auto` (one shot per
-   click). The shotgun fans 5 pellets evenly across its spread.
+   click), and optionally `projectile` (fx anim, default `bullet`), `pierce` (enemies a shot
+   passes through: plasma) and `blast` (explosion radius instead of a hit: launcher, which
+   also bursts at the end of its range and can hurt the player). The shotgun fans 5 pellets
+   evenly across its spread.
 
 ### Gameplay numbers used in the preview sim (starting values, tune freely)
 - Crawler: 3 HP, chases at ~36 px/s, bites at ~15 px range every 0.7 s.
@@ -139,9 +146,18 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
 
 ## Prototype: what exists
 
-- **Controls:** WASD/arrows move, mouse aims, LMB fires (rifle and shotgun automatic, pistol
-  semi-auto), 1/2/3, Q or wheel switch weapons, Esc/P pause, R restart, F fullscreen,
-  M mute.
+- **Controls:** WASD/arrows move, mouse aims, LMB fires (pistol and launcher semi-auto, the
+  rest automatic), 1-6, Q or wheel switch between unlocked weapons, Esc/P pause, R restart,
+  F fullscreen, M mute.
+- **Waves** (`internal/game/waves.go`): wave 1 is the enemies placed in the map; then each
+  string in `stationWaves` (map letters, one per enemy) trickles in through the outer doors
+  away from the player; then the Brood Mother appears at the map's `Q`. Between waves: a 4 s
+  break, +3 HP (full HP before the boss) and the next weapon unlocks (smg, plasma,
+  launcher). Killing the boss kills her brood and clears the deck.
+- **Doors** (`D` in the map, `=` starts open; need floor below): inner doors (floor above too)
+  slide open (`door_closed/half/open`, 0.25 s) while the player or an enemy is within 40 px;
+  outer doors (wall above) open only for enemies and are where waves come in. A closed door
+  blocks movement, bullets and sight like a wall; path finding treats every door as open.
 - **Rendering:** 480×270 canvas, window ×3, nearest scaling. The level is pre-rendered once
   (`renderLevel`); props, enemies and the player are y-sorted by feet each frame; corpses
   draw underneath; projectiles and FX on top. Hit flash uses `colorm`.
@@ -150,7 +166,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   dropped. Wired so far: weapon shots (named like the weapon) and bullet hits: `hit_flesh`
   (crawler, spitter), `hit_metal` (drone, explosive barrel), `hit_wall` (walls, other props),
   `hurt` / `player_death`, `<kind>_death` per enemy (`deathSound` in `enemy.go`), `explosion`
-  (barrels), and enemy attacks: `laser` (drone fires), `spit` and `acid_splash` (spitter glob).
+  (barrels, bombers, grenades), `door`, `boss_roar`, and enemy attacks: `laser` (drone fires),
+  `spit` and `acid_splash` (spitter glob), `spine` (boss ring).
   `hurt` and `player_death` are a voice made by source-filter synthesis (`voice()` in make_sfx.py). `BZ_MUTE=1`
   or running under `go test` skips audio entirely (no audio context is created).
 - **Projectiles** keep a *ground* position plus a height `H` they're drawn at. Collisions use
@@ -160,28 +177,37 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   player within their aggro range, then wake neighbours within 110 px. Crawlers follow a BFS
   flow field around walls (rebuilt every 0.25 s) and go straight at the player when close;
   spitters lob acid that leads the player (a growing ground marker shows where it lands);
-  drones keep 85–140 px away, strafe, fly over props and fire lasers. Crates block bullets and lasers in both directions (cover).
-- **Explosive barrels** take 3 hits, damage everything within ~44 px and chain to nearby barrels.
+  drones keep 85–140 px away, strafe, fly over props and fire lasers; bombers run in, swell
+  for 0.5 s and burst (shooting one sets it off, hurting enemies nearby too); brutes (20 HP)
+  wind up and charge in a straight line, stopping at walls. The boss (120 HP) crawls after the
+  player, touching her hurts, and cycles a ring of slow spines, an acid barrage and
+  summoning crawlers; below half HP she is faster and each attack is bigger. Crates block
+  bullets, lasers and spines in both directions (cover).
+- **Explosive barrels** take 3 hits, damage everything within ~44 px and chain to nearby barrels
+  (`blast` in combat.go, shared with bombers and grenades).
 - **Dev tools** (`internal/game/devtools.go`): `BZ_AUTOPILOT=1` lets a bot play
   (`BZ_AUTOPILOT=human` gives it shaky aim and 0.35 s reactions, a rough stand-in for a person);
   `BZ_RECORD=dir BZ_RECORD_SECONDS=30` saves every 3rd frame as PNG and then quits.
   `docs/previews/gameplay.gif` was made that way.
 - **Tests:** world parsing/connectivity (every spawn reachable), autotile vs the Python
   golden data, collision, line of sight, flow-field following, metadata completeness,
-  facing sectors, and full rounds played by the autopilot (clear, death, restart, barrel chains).
-  `TestDifficulty` plays 20 seeded rounds with the handicapped bot and fails if it clears under
-  half of them or keeps over 75% HP on average; run it with `-v` while tuning.
+  facing sectors, doors, the wave → boss → clear flow, and full rounds played by the autopilot
+  (clear, death, restart, barrel chains). `TestDifficulty` plays 20 seeded full games (all
+  waves and the boss) with the handicapped bot and fails if it clears under half of them or
+  keeps over 75% HP on average; run it with `-v` while tuning.
   Keep `TestStationIsConnected` passing when editing the map.
 
 ## Next steps
 
-- **Difficulty: play-test it.** Tuned against the bots only (October 2026): player 8 HP and
-  0.45 s invulnerability; crawlers 4 HP at 70 px/s; drones 7 HP; ranged cooldowns 2.0 s;
-  shots lead the player more (`globLead`, `laserLead`, `laserSpeed` in `enemy.go`). The
-  handicapped bot now clears in ~40 s with about 4.5/8 HP left and dies in a few % of rounds.
-  Most damage comes late (no healing), so pickups are the next lever if it feels harsh.
+- **Difficulty: play-test it.** Tuned against the bots only: player 8 HP and 0.45 s
+  invulnerability; crawlers 4 HP at 70 px/s; drones 7 HP; ranged cooldowns 2.0 s; shots lead
+  the player (`globLead`, `laserLead`, `laserSpeed` in `enemy.go`). With waves and the boss
+  (November 2026) the handicapped bot clears about half its games in ~150 s, ending with
+  ~4.8/8 HP; most of its deaths are to the boss. The bot only uses rifle/shotgun/pistol, so
+  a person with the unlocked guns should find it easier. Levers: `stationWaves`, boss `hp`,
+  `waveHeal`.
 - Real font for the HUD (currently `ebitenutil.DebugPrint`), ammo and reloading, pickups.
 - Music. More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call.
-- Closed doors that open when approached (`door_half` frame exists), more levels, a level
-  format loaded from files, waves or spawners.
+- More levels (each with its own wave list), a level format loaded from files.
+  `docs/previews/gameplay.gif` predates waves and doors; re-record it.
 - Possible later mode: turn-based tactics reusing the same tiles and sprites.

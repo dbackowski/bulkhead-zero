@@ -1,7 +1,7 @@
 {
   "frame_size": 24,
   "notes": {
-    "origin": "Feet/ground contact is at roughly (12, 21) in every 24x24 frame.",
+    "origin": "Feet/ground contact is at roughly (12, 21) in every 24x24 frame; (size/2, size-3) for bigger frames (\"size\").",
     "mirror": "Only *_right facings are drawn. For *_left use the *_right frames flipped horizontally (enemies too).",
     "fx": "bullet and laser point right; rotate them to the projectile heading.",
     "loop": "loop=false animations play once, then hold (death) or return to idle."
@@ -274,6 +274,42 @@
         "frames": 4,
         "frame_ms": 130,
         "loop": false
+      },
+      "bomber.walk_right": {
+        "row": 9,
+        "frames": 4,
+        "frame_ms": 110,
+        "loop": true
+      },
+      "bomber.attack_right": {
+        "row": 10,
+        "frames": 3,
+        "frame_ms": 90,
+        "loop": false
+      },
+      "bomber.death": {
+        "row": 11,
+        "frames": 2,
+        "frame_ms": 130,
+        "loop": false
+      },
+      "brute.walk_right": {
+        "row": 12,
+        "frames": 4,
+        "frame_ms": 110,
+        "loop": true
+      },
+      "brute.attack_right": {
+        "row": 13,
+        "frames": 4,
+        "frame_ms": 90,
+        "loop": false
+      },
+      "brute.death": {
+        "row": 14,
+        "frames": 4,
+        "frame_ms": 130,
+        "loop": false
       }
     },
     "fx.png": {
@@ -289,41 +325,82 @@
         "frame_ms": 50,
         "loop": true
       },
-      "hit_spark": {
+      "plasma": {
         "row": 2,
+        "frames": 2,
+        "frame_ms": 60,
+        "loop": true
+      },
+      "grenade": {
+        "row": 3,
+        "frames": 2,
+        "frame_ms": 100,
+        "loop": true
+      },
+      "spine": {
+        "row": 4,
+        "frames": 2,
+        "frame_ms": 80,
+        "loop": true
+      },
+      "hit_spark": {
+        "row": 5,
         "frames": 3,
         "frame_ms": 50,
         "loop": false
       },
       "acid_glob": {
-        "row": 3,
+        "row": 6,
         "frames": 2,
         "frame_ms": 90,
         "loop": true
       },
       "acid_splash": {
-        "row": 4,
+        "row": 7,
         "frames": 4,
         "frame_ms": 80,
         "loop": false
       },
       "explosion": {
-        "row": 5,
+        "row": 8,
         "frames": 6,
         "frame_ms": 70,
         "loop": false
       },
       "muzzle_flash": {
-        "row": 6,
+        "row": 9,
         "frames": 3,
         "frame_ms": 40,
         "loop": false
       },
       "crosshair": {
-        "row": 7,
+        "row": 10,
         "frames": 2,
         "frame_ms": 300,
         "loop": true
+      }
+    },
+    "boss.png": {
+      "idle": {
+        "row": 0,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true,
+        "size": 48
+      },
+      "attack": {
+        "row": 1,
+        "frames": 4,
+        "frame_ms": 90,
+        "loop": false,
+        "size": 48
+      },
+      "death": {
+        "row": 2,
+        "frames": 6,
+        "frame_ms": 130,
+        "loop": false,
+        "size": 48
       }
     }
   },
@@ -394,6 +471,77 @@
       "recoil_px": 3,
       "bullet_speed": 400,
       "damage": 1
+    },
+    "smg": {
+      "rect": [
+        0,
+        36,
+        24,
+        12
+      ],
+      "pivot": [
+        6,
+        7
+      ],
+      "muzzle": [
+        19,
+        5
+      ],
+      "fire_ms": 70,
+      "spread_deg": 7,
+      "pellets": 1,
+      "recoil_px": 1,
+      "bullet_speed": 400,
+      "damage": 1
+    },
+    "plasma": {
+      "rect": [
+        0,
+        48,
+        24,
+        12
+      ],
+      "pivot": [
+        6,
+        8
+      ],
+      "muzzle": [
+        22,
+        5
+      ],
+      "fire_ms": 300,
+      "spread_deg": 1,
+      "pellets": 1,
+      "recoil_px": 2,
+      "bullet_speed": 330,
+      "damage": 3,
+      "pierce": 3,
+      "projectile": "plasma"
+    },
+    "launcher": {
+      "rect": [
+        0,
+        60,
+        24,
+        12
+      ],
+      "pivot": [
+        7,
+        8
+      ],
+      "muzzle": [
+        22,
+        5
+      ],
+      "fire_ms": 750,
+      "spread_deg": 2,
+      "pellets": 1,
+      "recoil_px": 3,
+      "bullet_speed": 240,
+      "damage": 5,
+      "blast": 40,
+      "projectile": "grenade",
+      "semi_auto": true
     }
   }
 }

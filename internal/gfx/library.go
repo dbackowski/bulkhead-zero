@@ -2,6 +2,7 @@ package gfx
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"image"
 	_ "image/png" // register the PNG decoder
@@ -66,6 +67,9 @@ type Weapon struct {
 	BulletSpeed float64
 	Damage      int
 	SemiAuto    bool
+	Pierce      int
+	Blast       float64
+	Projectile  string // fx animation name, e.g. "fx.bullet"
 }
 
 // Library holds every loaded image and animation.
@@ -157,8 +161,12 @@ func Load(fsys fs.FS) (*Library, error) {
 			if a.FrameMS <= 0 {
 				a.FrameMS = 100
 			}
+			size := fsz
+			if m.Size > 0 {
+				size = m.Size
+			}
 			for i := 0; i < m.Frames; i++ {
-				a.Frames = append(a.Frames, sub(img, i*fsz, m.Row*fsz, fsz, fsz))
+				a.Frames = append(a.Frames, sub(img, i*size, m.Row*size, size, size))
 			}
 			lib.Anims[a.Name] = a
 		}
@@ -182,6 +190,9 @@ func Load(fsys fs.FS) (*Library, error) {
 			BulletSpeed: w.BulletSpeed,
 			Damage:      max(w.Damage, 1),
 			SemiAuto:    w.SemiAuto,
+			Pierce:      w.Pierce,
+			Blast:       w.Blast,
+			Projectile:  "fx." + cmp.Or(w.Projectile, "bullet"),
 		}
 	}
 	for f, a := range sm.Player.HandAnchor {

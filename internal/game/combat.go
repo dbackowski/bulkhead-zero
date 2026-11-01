@@ -2,6 +2,7 @@ package game
 
 import (
 	"math"
+	"slices"
 
 	"github.com/dbackowski/bulkhead-zero/internal/geom"
 	"github.com/dbackowski/bulkhead-zero/internal/gfx"
@@ -18,6 +19,10 @@ type Bullet struct {
 	Life   float64
 	Dmg    int
 	Rot    float64
+	Anim   string   // fx animation
+	Pierce int      // enemies it may pass through
+	Blast  float64  // explodes with this radius instead of hitting
+	hit    []*Enemy // already pierced
 }
 
 type shotKind int
@@ -25,6 +30,7 @@ type shotKind int
 const (
 	shotLaser shotKind = iota
 	shotGlob
+	shotSpine // the boss's; flies straight like a laser
 )
 
 // Shot is an enemy projectile: a straight laser, or an acid glob lobbed in an arc.
@@ -72,6 +78,9 @@ func (g *Game) updateBullets() {
 func (g *Game) stepBullet(b *Bullet) bool {
 	b.Life -= dt
 	if b.Life <= 0 {
+		if b.Blast > 0 {
+			g.blast(b.Ground, b.Blast, b.Dmg)
+		}
 		return false
 	}
 	step := b.Vel.Scale(dt / subSteps)
@@ -79,10 +88,14 @@ func (g *Game) stepBullet(b *Bullet) bool {
 		b.Ground = b.Ground.Add(step)
 		visual := b.Ground.Sub(geom.V(0, b.H))
 		for _, e := range g.enemies {
-			if e.State == stDead {
+			if e.State == stDead || slices.Contains(b.hit, e) {
 				continue
 			}
 			if b.Ground.Dist(e.Pos) < stats[e.Kind].radius {
+				if b.Blast > 0 {
+					g.blast(b.Ground, b.Blast, b.Dmg)
+					return false
+				}
 				g.damageEnemy(e, b.Dmg, b.Ground.Sub(b.Vel))
 				g.spawnFX("fx.hit_spark", visual, 0)
 				if e.Kind == drone {
@@ -90,8 +103,15 @@ func (g *Game) stepBullet(b *Bullet) bool {
 				} else {
 					g.sound("hit_flesh", b.Ground)
 				}
-				return false
+				if len(b.hit) >= b.Pierce {
+					return false
+				}
+				b.hit = append(b.hit, e)
 			}
+		}
+		if b.Blast > 0 && (g.lvl.WallAt(b.Ground) || g.lvl.PropAt(b.Ground) != nil) {
+			g.blast(b.Ground.Sub(step), b.Blast, b.Dmg) // just short of what it hit
+			return false
 		}
 		if pr := g.lvl.PropAt(b.Ground); pr != nil {
 			hit := "hit_wall"
@@ -120,7 +140,7 @@ func (g *Game) updateShots() {
 	keep := g.shots[:0]
 	for _, s := range g.shots {
 		switch s.Kind {
-		case shotLaser:
+		case shotLaser, shotSpine:
 			s.Life -= dt
 			step := s.Vel.Scale(dt / subSteps)
 			for i := 0; i < subSteps && !s.dead; i++ {
@@ -160,28 +180,35 @@ func (g *Game) updateShots() {
 	g.shots = keep
 }
 
-// explode blows up an explosive barrel: area damage, scorch mark, chain reactions.
+// explode blows up an explosive barrel.
 func (g *Game) explode(pr *world.Prop) {
 	if !pr.Alive {
 		return
 	}
 	g.lvl.RemoveProp(pr)
-	c := pr.Feet()
-	g.spawnFX("fx.explosion", pr.Center(), 0)
-	g.spawnFX("fx.explosion", pr.Center().Add(geom.V(5, -6)), 0)
-	g.scorches = append(g.scorches, pr.Center())
+	g.blast(pr.Feet(), 44, 4)
+}
+
+// blast is an explosion on the ground at c (barrels, bombers, grenades): it
+// deals dmg to enemies within r, 2 to the player a little closer in, leaves a
+// scorch mark and sets off barrels nearby.
+func (g *Game) blast(c geom.Vec, r float64, dmg int) {
+	v := c.Sub(geom.V(0, 9))
+	g.spawnFX("fx.explosion", v, 0)
+	g.spawnFX("fx.explosion", v.Add(geom.V(5, -6)), 0)
+	g.scorches = append(g.scorches, v)
 	g.shake(4, 0.25)
 	g.sound("explosion", c)
 	for _, e := range g.enemies {
-		if e.State != stDead && e.Pos.Dist(c) < 44 {
-			g.damageEnemy(e, 4, c)
+		if e.State != stDead && e.Pos.Dist(c) < r {
+			g.damageEnemy(e, dmg, c)
 		}
 	}
-	if g.player.Pos.Dist(c) < 38 {
+	if g.player.Pos.Dist(c) < r-6 {
 		g.hurtPlayer(2, c)
 	}
 	for _, o := range g.lvl.Props {
-		if o.Alive && o.Explosive && o != pr && o.Feet().Dist(c) < 48 {
+		if o.Alive && o.Explosive && o.Feet().Dist(c) < r+4 {
 			g.blasts = append(g.blasts, pendingBlast{prop: o, in: 0.15})
 		}
 	}

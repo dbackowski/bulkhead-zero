@@ -33,6 +33,10 @@ func renderLevel(lib *gfx.Library, l *world.Level) *ebiten.Image {
 				at(lib.T(l.FloorTile(x, y)), x, y)
 				continue
 			}
+			if l.DoorAt(x, y) != nil { // doors move: drawn each frame
+				at(lib.T("floor_plate_a"), x, y)
+				continue
+			}
 			tiles := l.WallTiles(x, y)
 			if !isCap(tiles[0]) { // faces and doors sit on a floor tile
 				at(lib.T("floor_plate_a"), x, y)
@@ -61,6 +65,11 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(-cam.X, -cam.Y)
 	dst.DrawImage(g.static, op)
+	for _, d := range g.lvl.Doors {
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(float64(d.TX*world.T)-cam.X, float64(d.TY*world.T)-cam.Y)
+		dst.DrawImage(g.lib.T(doorTile(d)), op)
+	}
 	for _, s := range g.scorches {
 		gfx.DrawCentered(dst, g.lib.T("decal_scorch"), s.X-cam.X, s.Y-cam.Y, 0)
 	}
@@ -104,51 +113,60 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 	// projectiles and effects on top
 	for _, b := range g.bullets {
 		v := b.Ground.Sub(geom.V(0, b.H)).Sub(cam)
-		gfx.DrawCentered(dst, g.lib.A("fx.bullet").Frame(g.t), v.X, v.Y, b.Rot)
+		gfx.DrawCentered(dst, g.lib.A(b.Anim).Frame(g.t), v.X, v.Y, b.Rot)
 	}
 	for _, s := range g.shots {
 		v := s.Ground.Sub(geom.V(0, s.H)).Sub(cam)
 		switch s.Kind {
 		case shotLaser:
 			gfx.DrawCentered(dst, g.lib.A("fx.laser").Frame(g.t), v.X, v.Y, s.Vel.Angle())
+		case shotSpine:
+			gfx.DrawCentered(dst, g.lib.A("fx.spine").Frame(g.t), v.X, v.Y, s.Vel.Angle())
 		case shotGlob:
 			gfx.DrawCentered(dst, g.lib.A("fx.acid_glob").Frame(s.T), v.X, v.Y, 0)
 		}
 	}
 	for _, f := range g.fx {
+		if f.T < 0 {
+			continue // delayed (the boss's death blasts)
+		}
 		gfx.DrawCentered(dst, f.Anim.Frame(f.T), f.Pos.X-cam.X, f.Pos.Y-cam.Y, f.Rot)
 	}
 }
 
+var enemyAnim = map[enemyKind]string{crawler: "crawler", spitter: "spitter", drone: "drone",
+	bomber: "bomber", brute: "brute", boss: "boss"}
+
 func (g *Game) drawEnemy(dst *ebiten.Image, e *Enemy, cam geom.Vec) {
-	var name string
-	t := e.AnimT
-	switch e.Kind {
-	case crawler:
-		name = "crawler.walk_right"
-		if e.State == stAttack {
-			name = "crawler.attack_right"
-		}
-	case spitter:
-		name = "spitter.idle"
-		if e.State == stAttack {
-			name = "spitter.attack"
-		}
-	case drone:
-		name = "drone.idle"
-		if e.State == stAttack {
-			name = "drone.attack"
-		}
+	// side-on enemies only have *_right frames, mirrored for left
+	side := e.Kind == crawler || e.Kind == bomber || e.Kind == brute
+	name, t := enemyAnim[e.Kind], e.AnimT
+	switch {
+	case e.State == stDead:
+		name, t = name+".death", e.DeadT
+	case e.State == stAttack && side:
+		name += ".attack_right"
+	case e.State == stAttack:
+		name += ".attack"
+	case side:
+		name += ".walk_right"
+	default:
+		name += ".idle"
 	}
-	if e.State == stDead {
-		name = map[enemyKind]string{crawler: "crawler.death", spitter: "spitter.death", drone: "drone.death"}[e.Kind]
-		t = e.DeadT
+	a := g.lib.A(name)
+	img := a.Frame(t)
+	if e.Kind == brute && e.State == stAttack { // frames 0-1 wind-up, 2-3 charge
+		i := int(e.T*10) % 2
+		if e.T >= stats[brute].fireAt {
+			i += 2
+		}
+		img = a.Frames[i]
 	}
-	o := gfx.SpriteOpts{Flip: e.Kind == crawler && e.FaceLeft}
+	o := gfx.SpriteOpts{Flip: side && e.FaceLeft}
 	if e.Flash > 0 {
 		o.Flash = 0.85
 	}
-	gfx.DrawAtFeet(dst, g.lib.A(name).Frame(t), e.Pos.X-cam.X, e.Pos.Y-cam.Y, o)
+	gfx.DrawAtFeet(dst, img, e.Pos.X-cam.X, e.Pos.Y-cam.Y, o)
 }
 
 func (g *Game) drawPlayer(dst *ebiten.Image, cam geom.Vec) {

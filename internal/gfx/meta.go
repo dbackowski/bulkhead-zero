@@ -15,6 +15,7 @@ type AnimMeta struct {
 	FrameMS int   `json:"frame_ms"`
 	Loop    bool  `json:"loop"`
 	Bob     []int `json:"bob"`
+	Size    int   `json:"size"` // frame size when not the sheet default (the boss is 48)
 }
 
 // WeaponMeta describes a weapon sprite (drawn pointing right) and its stats.
@@ -28,7 +29,10 @@ type WeaponMeta struct {
 	RecoilPx    float64 `json:"recoil_px"`
 	BulletSpeed float64 `json:"bullet_speed"`
 	Damage      int     `json:"damage"`
-	SemiAuto    bool    `json:"semi_auto"` // fires once per click
+	SemiAuto    bool    `json:"semi_auto"`  // fires once per click
+	Pierce      int     `json:"pierce"`     // enemies a shot passes through before stopping
+	Blast       float64 `json:"blast"`      // explosion radius in px (0 = plain bullet)
+	Projectile  string  `json:"projectile"` // fx animation, default "bullet"
 }
 
 // PlayerMeta holds the detached-gun aiming data.

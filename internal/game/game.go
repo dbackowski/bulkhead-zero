@@ -1,5 +1,5 @@
-// Package game is the playable prototype: one station level, the marine,
-// three enemy types, weapons, camera and HUD.
+// Package game is the playable prototype: one station level fought in waves
+// ending with a boss, the marine, five enemy types, weapons, camera and HUD.
 package game
 
 import (
@@ -55,7 +55,16 @@ type Game struct {
 	t          float64
 	stateT     float64
 	state      state
-	totalFoes  int
+	totalFoes  int // in the current wave
+	kills      int
+	wave       int    // 1 = the enemies placed in the map
+	queue      []byte // enemies of this wave still to come in
+	spawnT     float64
+	nextIn     float64 // countdown to the next wave
+	boss       *Enemy
+	unlocked   int // weapons available (slots 0..unlocked-1)
+	banner     string
+	bannerT    float64
 	autopilot  *autopilot
 	recorder   *recorder
 	sfx        *sfx // nil when muted at launch
@@ -111,7 +120,9 @@ func (g *Game) reset() error {
 	for _, s := range lvl.Spawns {
 		g.enemies = append(g.enemies, newEnemy(s, g.rng))
 	}
-	g.totalFoes = len(g.enemies)
+	g.totalFoes, g.kills = len(g.enemies), 0
+	g.wave, g.queue, g.nextIn, g.boss, g.banner, g.bannerT = 1, nil, 0, nil, "", 0
+	g.unlocked = min(3, len(g.weapons))
 	g.bullets, g.shots, g.fx, g.scorches, g.blasts = nil, nil, nil, nil, nil
 	g.state, g.stateT, g.t = statePlaying, 0, 0
 	g.flow = lvl.DistanceField(g.player.Pos)
@@ -165,17 +176,19 @@ func (g *Game) Update() error {
 	for _, e := range g.enemies {
 		g.updateEnemy(e)
 	}
+	g.updateDoors()
+	g.bannerT -= dt
+	if g.state == statePlaying {
+		g.updateWaves()
+	}
 	g.updateBullets()
 	g.updateShots()
 	g.updateBlasts()
 	g.updateFX()
 	g.updateCamera(in.Mouse)
 
-	switch {
-	case g.state == statePlaying && g.player.Dead && g.player.DeadT > 1.2:
+	if g.state == statePlaying && g.player.Dead && g.player.DeadT > 1.2 {
 		g.state, g.stateT = stateDead, 0
-	case g.state == statePlaying && g.aliveFoes() == 0:
-		g.state, g.stateT = stateClear, 0
 	}
 	if g.recorder != nil {
 		g.recorder.tick(g)

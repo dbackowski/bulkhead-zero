@@ -7,7 +7,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/colorm"
 )
 
-// Feet is where the ground contact sits inside every 24x24 frame.
+// Feet is where the ground contact sits inside every 24x24 frame. Bigger
+// frames keep the same rule: (width/2, height-3).
 const FeetX, FeetY = 12, 21
 
 // SpriteOpts tweaks how a frame is drawn.
@@ -17,14 +18,15 @@ type SpriteOpts struct {
 	Alpha float64 // 0 means fully opaque
 }
 
-// DrawAtFeet draws a 24x24 frame so its feet land on screen position (x, y).
+// DrawAtFeet draws a frame so its feet land on screen position (x, y).
 func DrawAtFeet(dst, img *ebiten.Image, x, y float64, o SpriteOpts) {
+	w, h := img.Bounds().Dx(), img.Bounds().Dy()
 	var g ebiten.GeoM
 	if o.Flip {
 		g.Scale(-1, 1)
-		g.Translate(float64(img.Bounds().Dx()), 0)
+		g.Translate(float64(w), 0)
 	}
-	g.Translate(math.Round(x-FeetX), math.Round(y-FeetY))
+	g.Translate(math.Round(x-float64(w/2)), math.Round(y-float64(h-3)))
 	draw(dst, img, g, o)
 }
 

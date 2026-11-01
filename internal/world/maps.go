@@ -3,13 +3,15 @@ package world
 // Station is the prototype level: five rooms around a central hall.
 // Start (south-west), lab (north-west), hall (centre), spitter nest
 // (north-east) and storage (south-east). See level.go for the legend.
+// Wave enemies come in through the outer doors (top wall, and the walls
+// above the two southern side rooms); the boss appears in the hall.
 var Station = []string{
 	"########################################",
-	"##L##P##L##!####L###D###L##P###!#L#D#!##",
+	"##L##D##L##!####L###D###L##P###!#L#D#!##",
 	"#.c.c....kk..##.............##b.......b#",
 	"#............##.............##......S..#",
 	"#............##.....C.....B.##...a.....#",
-	"#...........................##.........#",
+	"#....................Q......##.........#",
 	"#...xx...C........xx...........a..R....#",
 	"#....................R.................#",
 	"#.......a....##.......~..............a.#",
@@ -18,7 +20,7 @@ var Station = []string{
 	"#............##......B......##.........#",
 	"######.########hhh..........######.#####",
 	"######.########..........C..######.#####",
-	"##L###=##P#####..xx.........###L##=##P##",
+	"##L#D#D##P#####..xx.........###L##D##D##",
 	"#.tc.........##......g......##.c.......#",
 	"#............##......g......##.......xx#",
 	"#............##......g.x....##..C......#",

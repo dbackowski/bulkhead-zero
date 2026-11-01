@@ -40,7 +40,7 @@ func readInput(g *Game) Input {
 	in.Mouse = geom.V(float64(mx), float64(my))
 	in.Fire = ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 	in.FirePressed = inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
-	for i, k := range []ebiten.Key{ebiten.Key1, ebiten.Key2, ebiten.Key3} {
+	for i, k := range []ebiten.Key{ebiten.Key1, ebiten.Key2, ebiten.Key3, ebiten.Key4, ebiten.Key5, ebiten.Key6} {
 		if inpututil.IsKeyJustPressed(k) {
 			in.SelectSlot = i
 		}

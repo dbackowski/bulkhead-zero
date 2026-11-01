@@ -14,7 +14,13 @@ const (
 	crawler enemyKind = iota
 	spitter
 	drone
+	bomber // runs at the player and bursts
+	brute  // slow and tough, charges
+	boss   // the Brood Mother, after the last wave
 )
+
+// Map letters for each kind (see world/level.go), also used by the wave lists.
+var kindFor = map[byte]enemyKind{'C': crawler, 'S': spitter, 'R': drone, 'E': bomber, 'G': brute, 'Q': boss}
 
 type enemyState int
 
@@ -40,6 +46,11 @@ var stats = map[enemyKind]enemyStats{
 	crawler: {hp: 4, radius: 9, aggro: 170, speed: 70, cooldown: 0.55, attackLen: 0.36, fireAt: 0.18},
 	spitter: {hp: 6, radius: 10, aggro: 210, speed: 0, cooldown: 2.0, attackLen: 0.45, fireAt: 0.18},
 	drone:   {hp: 7, radius: 9, aggro: 210, speed: 42, cooldown: 2.0, attackLen: 0.36, fireAt: 0.18},
+	// bomber: attackLen is the fuse once it is next to the player
+	bomber: {hp: 2, radius: 8, aggro: 170, speed: 62, attackLen: 0.5},
+	// brute: winds up until fireAt, then charges until attackLen
+	brute: {hp: 20, radius: 11, aggro: 190, speed: 30, cooldown: 2.4, attackLen: 1.15, fireAt: 0.55},
+	boss:  {hp: 120, radius: 17, aggro: 999, speed: 24, cooldown: 1.6, attackLen: 0.7, fireAt: 0.35},
 }
 
 // Enemy shots: how far ahead they aim (seconds of player movement) and laser speed (px/s).
@@ -47,6 +58,10 @@ const (
 	globLead   = 0.7
 	laserLead  = 0.25
 	laserSpeed = 260
+
+	bomberBlast = 40.0  // px
+	bruteCharge = 200.0 // px/s
+	spineSpeed  = 150.0 // the boss's spines are slow enough to weave through
 )
 
 // Enemy is any hostile. Pos is the feet (or, for the drone, its shadow).
@@ -64,10 +79,12 @@ type Enemy struct {
 	Fired    bool
 	Strafe   float64
 	DeadT    float64
+	Dir      geom.Vec // brute: charge direction
+	Pattern  int      // boss: which attack comes next
 }
 
 func newEnemy(s world.Spawn, rng *rand.Rand) *Enemy {
-	k := map[byte]enemyKind{'C': crawler, 'S': spitter, 'R': drone}[s.Kind]
+	k := kindFor[s.Kind]
 	return &Enemy{
 		Kind:   k,
 		Pos:    s.Pos,
@@ -140,6 +157,12 @@ func (g *Game) updateEnemy(e *Enemy) {
 		g.updateSpitter(e, st, d, los)
 	case drone:
 		g.updateDrone(e, st, d, los)
+	case bomber:
+		g.updateBomber(e, st, d, los)
+	case brute:
+		g.updateBrute(e, st, d, los)
+	case boss:
+		g.updateBoss(e, st, d, los)
 	}
 }
 
@@ -176,24 +199,154 @@ func (g *Game) updateCrawler(e *Enemy, st enemyStats, d float64, los bool) {
 			e.CD = st.cooldown
 		}
 	default:
-		dir := g.chaseDir(e, los, d)
-		// keep crawlers from stacking on one pixel
-		var sep geom.Vec
-		for _, o := range g.enemies {
-			if o == e || o.State == stDead || o.Kind == drone {
-				continue
-			}
-			if od := o.Pos.Dist(e.Pos); od < 14 && od > 0 {
-				sep = sep.Add(e.Pos.Sub(o.Pos).Scale((14 - od) / od))
-			}
-		}
-		v := dir.Scale(st.speed).Add(sep.Scale(6))
-		if d > 13 {
-			e.Pos = g.lvl.MoveAndSlide(e.Pos, v.Scale(dt), 4, 3, false)
-		}
+		g.walk(e, st.speed, d, los)
 		if d < 18 && e.CD <= 0 {
 			e.setState(stAttack)
 		}
+	}
+}
+
+// walk moves a ground enemy toward the player, keeping it from stacking on others.
+func (g *Game) walk(e *Enemy, speed, d float64, los bool) {
+	dir := g.chaseDir(e, los, d)
+	var sep geom.Vec
+	for _, o := range g.enemies {
+		if o == e || o.State == stDead || o.Kind == drone {
+			continue
+		}
+		if od := o.Pos.Dist(e.Pos); od < 14 && od > 0 {
+			sep = sep.Add(e.Pos.Sub(o.Pos).Scale((14 - od) / od))
+		}
+	}
+	v := dir.Scale(speed).Add(sep.Scale(6))
+	if d > 13 {
+		e.Pos = g.lvl.MoveAndSlide(e.Pos, v.Scale(dt), 4, 3, false)
+	}
+}
+
+func (g *Game) updateBomber(e *Enemy, st enemyStats, d float64, los bool) {
+	e.FaceLeft = g.player.Pos.X < e.Pos.X
+	switch e.State {
+	case stAttack:
+		if e.T >= st.attackLen {
+			g.kill(e)
+		}
+	default:
+		g.walk(e, st.speed, d, los)
+		if d < 24 {
+			e.setState(stAttack)
+		}
+	}
+}
+
+func (g *Game) updateBrute(e *Enemy, st enemyStats, d float64, los bool) {
+	p := g.player
+	switch {
+	case e.State != stAttack:
+		e.FaceLeft = p.Pos.X < e.Pos.X
+		g.walk(e, st.speed, d, los)
+		if e.CD <= 0 && los && d < 140 {
+			e.setState(stAttack)
+		}
+	case e.T < st.fireAt: // wind-up: keep turning toward the player
+		e.FaceLeft = p.Pos.X < e.Pos.X
+		e.Dir = p.Pos.Add(p.Vel.Scale(0.2)).Sub(e.Pos).Norm()
+	case e.T < st.attackLen: // charge in a straight line
+		before := e.Pos
+		e.Pos = g.lvl.MoveAndSlide(e.Pos, e.Dir.Scale(bruteCharge*dt), 4, 3, false)
+		if !e.Fired && e.Pos.Dist(p.Pos) < 16 {
+			e.Fired = true
+			g.hurtPlayer(2, e.Pos)
+		}
+		if e.Pos.Dist(before) < bruteCharge*dt*0.5 { // ran into something
+			e.T = st.attackLen
+			g.shake(1.5, 0.1)
+		}
+	default:
+		e.setState(stChase)
+		e.CD = st.cooldown
+	}
+}
+
+// updateBoss: the Brood Mother crawls after the player and cycles through a
+// ring of spines, an acid barrage and summoning her brood. Below half health
+// she is faster and every attack is bigger.
+func (g *Game) updateBoss(e *Enemy, st enemyStats, d float64, los bool) {
+	enraged := e.HP*2 < st.hp
+	if d < 22 {
+		g.hurtPlayer(2, e.Pos) // touching her hurts
+	}
+	switch e.State {
+	case stAttack:
+		if !e.Fired && e.T >= st.fireAt {
+			e.Fired = true
+			g.bossAttack(e, enraged)
+		}
+		if e.T >= st.attackLen {
+			e.setState(stChase)
+			e.CD = st.cooldown
+			if enraged {
+				e.CD *= 0.65
+			}
+		}
+	default:
+		speed := st.speed
+		if enraged {
+			speed *= 1.4
+		}
+		if d > 40 {
+			e.Pos = g.lvl.MoveAndSlide(e.Pos, g.chaseDir(e, los, d).Scale(speed*dt), 8, 5, false)
+		}
+		if e.CD <= 0 && los {
+			e.setState(stAttack)
+		}
+	}
+}
+
+func (g *Game) bossAttack(e *Enemy, enraged bool) {
+	p := g.player
+	from := e.Pos.Sub(geom.V(0, 4))
+	pattern := e.Pattern % 3
+	e.Pattern++
+	if pattern == 2 && g.aliveFoes() > 7 {
+		pattern = 0 // enough brood out already
+	}
+	switch pattern {
+	case 0: // ring of spines
+		n := 12
+		if enraged {
+			n = 18
+		}
+		off := g.rng.Float64()
+		for i := 0; i < n; i++ {
+			a := (float64(i) + off) / float64(n) * 2 * math.Pi
+			g.shots = append(g.shots, &Shot{Kind: shotSpine, Ground: from, Vel: geom.FromAngle(a).Scale(spineSpeed), H: 16, Life: 3})
+		}
+		g.sound("spine", from)
+	case 1: // acid barrage on and around the player
+		n := 3
+		if enraged {
+			n = 5
+		}
+		for i := 0; i < n; i++ {
+			to := p.Pos.Add(p.Vel.Scale(globLead)).Add(geom.FromAngle(g.rng.Float64() * 2 * math.Pi).Scale(float64(i) * 20))
+			g.shots = append(g.shots, &Shot{Kind: shotGlob, From: from, To: to, Ground: from,
+				Dur: 0.5 + from.Dist(to)/420 + float64(i)*0.08, H: 12})
+		}
+		g.sound("spit", from)
+	case 2: // brood
+		kinds := "CCC"
+		if enraged {
+			kinds = "CCEC"
+		}
+		for i := range kinds {
+			pos := e.Pos.Add(geom.FromAngle(float64(i)*2*math.Pi/float64(len(kinds)) + g.rng.Float64()).Scale(24))
+			if g.lvl.RectBlocked(pos, 4, 3, false) {
+				pos = e.Pos
+			}
+			g.spawnHunter(kinds[i], pos)
+		}
+		g.sound("boss_roar", from)
 	}
 }
 
@@ -277,27 +430,52 @@ func (g *Game) damageEnemy(e *Enemy, dmg int, from geom.Vec) {
 	e.HP -= dmg
 	e.Flash = 0.07
 	g.alert(e)
-	if e.Kind == crawler {
+	if e.Kind == crawler || e.Kind == bomber {
 		push := e.Pos.Sub(from).Norm().Scale(2.5)
 		e.Pos = g.lvl.MoveAndSlide(e.Pos, push, 4, 3, false)
 	}
 	if e.HP <= 0 {
-		e.setState(stDead)
-		e.DeadT = 0
-		g.sound(deathSound[e.Kind], e.Pos)
-		if e.Kind == drone {
-			g.spawnFX("fx.explosion", e.Pos.Sub(geom.V(0, 12)), 0)
-			g.shake(2, 0.15)
+		g.kill(e)
+	}
+}
+
+func (g *Game) kill(e *Enemy) {
+	e.setState(stDead)
+	e.DeadT = 0
+	g.kills++
+	g.sound(deathSound[e.Kind], e.Pos)
+	switch e.Kind {
+	case drone:
+		g.spawnFX("fx.explosion", e.Pos.Sub(geom.V(0, 12)), 0)
+		g.shake(2, 0.15)
+	case bomber:
+		g.blast(e.Pos, bomberBlast, 3)
+	case boss:
+		for i := 0; i < 6; i++ {
+			off := geom.FromAngle(float64(i) * 1.1).Scale(float64(6 + i*3))
+			g.fx = append(g.fx, &FX{Anim: g.lib.A("fx.explosion"), Pos: e.Pos.Sub(geom.V(0, 18)).Add(off), T: -0.12 * float64(i)})
+		}
+		g.shake(6, 0.8)
+		g.shots = nil
+		for _, o := range g.enemies { // her brood dies with her
+			if o.State != stDead {
+				o.setState(stDead)
+				o.DeadT = 0
+			}
 		}
 	}
 }
 
-var deathSound = map[enemyKind]string{crawler: "crawler_death", spitter: "spitter_death", drone: "drone_death"}
+var deathSound = map[enemyKind]string{crawler: "crawler_death", spitter: "spitter_death", drone: "drone_death",
+	bomber: "explosion", brute: "brute_death", boss: "boss_death"}
 
-// flying enemies draw a bit higher and sort by their shadow.
+// height is how far above the feet an enemy's body centre is (for aiming).
 func (e *Enemy) height() float64 {
-	if e.Kind == drone {
+	switch e.Kind {
+	case drone:
 		return 12
+	case boss:
+		return 20
 	}
 	return 7
 }

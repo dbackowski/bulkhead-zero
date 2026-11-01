@@ -335,6 +335,70 @@ def drone_death(rng, v):
     return finish(reverb(mix(scale(whine, 0.35), blast), 0.25, size=1.1), fade=0.08)
 
 
+def plasma(rng, v):
+    """A charged energy bolt: a rising whine that snaps into a falling zap."""
+    n = int(0.35 * RATE)
+    charge = scale(fm(n, sweep(300, 1400 + 80 * v, 0.03), 60, 0.05, 0.03), 0.5)
+    zap = drive(fm(n, sweep(1800 + 100 * v, 220, 0.06), 140, 0.15, 0.1), 2.5)
+    thump = scale(tone(n, sweep(180, 60, 0.02), 0.04), 0.5)
+    return finish(reverb(biquad(mix(charge, zap, thump), "lp", 7000), 0.22, size=0.9))
+
+
+def launcher(rng, v):
+    """A hollow "thoomp": a low tube pop with a puff of air, no crack."""
+    n = int(0.45 * RATE)
+    pop = scale(tone(n, sweep(220 - 10 * v, 70, 0.03), 0.07), 1.0)
+    puff = env(biquad(noise(rng, n), "lp", sweep(1800, 300, 0.03), q=0.8), 0.05)
+    clack = scale(env(biquad(noise(rng, n), "bp", 2400, q=3), 0.005, delay=0.2), 1.2)
+    return finish(reverb(drive(mix(pop, scale(puff, 0.7), clack), 2.0), 0.2, size=1.0))
+
+
+def door(rng, v):
+    """A pneumatic bulkhead door: a hiss of air over a short servo whirr."""
+    n = int(0.4 * RATE)
+    hiss = env(biquad(noise(rng, n), "bp", sweep(5000, 2200 + 200 * v, 0.1), q=0.7), 0.12)
+    hiss = [x * min(1.0, i / (0.02 * RATE)) for i, x in enumerate(hiss)]
+    whirr = scale(fm(n, sweep(180, 240 + 15 * v, 0.1), 30, 0.2, 0.15), 0.4)
+    clunk = scale(delayed(tone(n, sweep(160, 70, 0.02), 0.03), 0.25), 0.5)
+    return finish(mix(scale(hiss, 0.8), whirr, clunk), fade=0.05)
+
+
+def brute_death(rng, v):
+    """A deep bellow sinking into a heavy body slam."""
+    n = int(1.0 * RATE)
+    bellow = biquad(fm(n, sweep(260 + 20 * v, 70, 0.3), 17 + 2 * v, 0.6, 0.35), "lp", 1100)
+    slam = delayed(boom(rng, n, 0.04, 0.12, 0.8, 2.0), 0.45)
+    return finish(drive(mix(scale(bellow, 1.4), scale(slam, 0.8)), 1.8), fade=0.08)
+
+
+def boss_roar(rng, v):
+    """The Brood Mother: two detuned growling voices and a rasp, swelling then falling."""
+    n = int(1.4 * RATE)
+    swell = lambda i: min(1.0, i / (0.25 * RATE))
+    a = fm(n, sweep(150 + 10 * v, 75, 0.7), 23, 0.5, 0.8)
+    b = fm(n, sweep(225 + 12 * v, 105, 0.6), 31, 0.4, 0.7)
+    rasp = env(biquad(noise(rng, n), "bp", sweep(1500, 600, 0.5), q=1.5), 0.6)
+    s = [swell(i) * x for i, x in enumerate(mix(a, scale(b, 0.7), scale(rasp, 0.8)))]
+    return finish(reverb(drive(biquad(s, "lp", 2500), 2.2), 0.35, size=1.5, decay=0.82), fade=0.15)
+
+
+def boss_death(rng, v):
+    """A long falling shriek over a rolling double explosion."""
+    n = int(2.2 * RATE)
+    shriek = scale(fm(n, sweep(900 + 50 * v, 90, 0.6), 37, 0.4, 0.7), 0.7)
+    shriek = biquad(shriek, "bp", 900, q=0.5)
+    blasts = mix(boom(rng, n, 0.15, 0.4, 0.6, 3.0), delayed(boom(rng, n, 0.2, 0.5, 0.7, 3.0), 0.5))
+    return finish(reverb(mix(shriek, blasts), 0.35, size=1.5, decay=0.84), fade=0.3)
+
+
+def spine(rng, v):
+    """The Brood Mother flings bone spines: a short wet whip."""
+    n = int(0.2 * RATE)
+    whip = env(biquad(noise(rng, n), "bp", sweep(3000 + 200 * v, 800, 0.03), q=2.0), 0.04)
+    thock = scale(tone(n, sweep(400, 160, 0.01), 0.02), 0.5)
+    return finish(drive(mix(whip, thock), 1.6))
+
+
 # name: (generator(rng, variant) -> samples, loudness). Loudness is the RMS of
 # the loudest 50 ms above 200 Hz, i.e. roughly how loud it sounds on laptop
 # speakers, so these numbers compare directly; peaks are capped at 0.9.
@@ -356,6 +420,16 @@ SOUNDS = {
     "laser": (laser, 0.15),
     "spit": (spit, 0.12),
     "acid_splash": (acid_splash, 0.13),
+    # appended, not inserted: each sound's seed comes from its position here
+    "smg": (lambda rng, v: gun(rng, 0.26, 0.7, sweep(7500 - 300 * v, 1400, 0.014), 0.02,
+                               sweep(220 - 10 * v, 90, 0.008), 0.012, 0.45, 2.4, 0.16, 0.8), 0.17),
+    "plasma": (plasma, 0.18),
+    "launcher": (launcher, 0.22),
+    "door": (door, 0.08),
+    "brute_death": (brute_death, 0.20),
+    "boss_roar": (boss_roar, 0.28),
+    "boss_death": (boss_death, 0.30),
+    "spine": (spine, 0.10),
 }
 
 

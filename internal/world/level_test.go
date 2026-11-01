@@ -30,6 +30,33 @@ func TestStationParses(t *testing.T) {
 	if l.RectBlocked(l.Start, 4, 3, false) {
 		t.Fatal("player starts inside something solid")
 	}
+	if l.Boss == (geom.Vec{}) || l.RectBlocked(l.Boss, 8, 5, false) {
+		t.Fatalf("bad boss spawn %v", l.Boss)
+	}
+	inner, outer := 0, 0
+	for _, d := range l.Doors {
+		if d.Inner {
+			inner++
+		} else {
+			outer++
+		}
+	}
+	if inner != 2 || outer != 5 {
+		t.Fatalf("want 2 inner and 5 outer doors, got %d and %d", inner, outer)
+	}
+}
+
+func TestDoorsBlockUntilOpen(t *testing.T) {
+	l := station(t)
+	d := l.DoorAt(6, 14)
+	c := d.Center()
+	if d == nil || !l.WallAt(c) || l.LineOfSight(c.Sub(geom.V(0, T)), c.Add(geom.V(0, T))) {
+		t.Fatal("a closed door should block like a wall")
+	}
+	l.SetDoorOpen(d, 1)
+	if l.WallAt(c) || l.SolidAt(c, false) {
+		t.Fatal("an open door should let things through")
+	}
 }
 
 // Every enemy must be able to reach the player and vice versa, and every floor
@@ -119,6 +146,9 @@ func TestLineOfSight(t *testing.T) {
 func TestNextStepWalksDownhill(t *testing.T) {
 	l := station(t)
 	target := geom.V(20*T+12, 4*T+14) // hall
+	for _, d := range l.Doors {
+		l.SetDoorOpen(d, 1) // the game opens doors for whoever walks up
+	}
 	field := l.DistanceField(target)
 	p := l.Start
 	for i := 0; i < 2000; i++ {

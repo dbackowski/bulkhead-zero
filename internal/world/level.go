@@ -5,6 +5,7 @@ package world
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/dbackowski/bulkhead-zero/internal/geom"
 )
@@ -14,12 +15,14 @@ const T = 24
 
 // Map characters. Anything not listed is plain floor.
 //
-//	walls:  # (face picked by hash)  L light  P pipe  ! warning  D closed door
-//	doors:  = open door (a wall-face tile you can walk and shoot through)
+//	walls:  # (face picked by hash)  L light  P pipe  ! warning
+//	doors:  D door, = door that starts open. A door needs floor below it. With
+//	        floor above too it is an inner door that slides open for anyone
+//	        near; with wall above it is an outer door where wave enemies enter.
 //	floors: . plate  g grate  h hazard  v vent  s light strip
 //	decals: a acid  z scorch  ~ cables
 //	props:  x crate  c console  k locker  t terminal  b toxic barrel  B explosive barrel
-//	spawns: @ player  C crawler  S spitter  R drone
+//	spawns: @ player  C crawler  S spitter  R drone  E bomber  G brute  Q boss
 const wallChars = "#LP!D="
 
 var floorChars = map[byte]string{'g': "floor_grate", 'h': "floor_hazard", 'v': "floor_vent", 's': "floor_lightstrip"}
@@ -47,6 +50,20 @@ type Spawn struct {
 	Pos  geom.Vec
 }
 
+// Door is a sliding bulkhead door. Open runs from 0 (closed) to 1; at
+// DoorOpenAt or more it no longer blocks movement, bullets or sight.
+type Door struct {
+	TX, TY int
+	Open   float64
+	Inner  bool // floor on both sides; outer doors have wall behind them
+}
+
+// DoorOpenAt is how far a door must slide open before things can pass.
+const DoorOpenAt = 0.6
+
+// Center is the middle of the door's tile.
+func (d *Door) Center() geom.Vec { return geom.V(float64(d.TX*T+12), float64(d.TY*T+12)) }
+
 // Decal is a flat overlay drawn on the floor.
 type Decal struct {
 	Name   string
@@ -58,12 +75,15 @@ type Level struct {
 	W, H   int
 	Rows   []string
 	Start  geom.Vec
+	Boss   geom.Vec // where the boss appears ('Q'); zero if the map has none
 	Spawns []Spawn
+	Doors  []*Door
 	Props  []*Prop
 	Decals []Decal
 	solid  []bool // walls + living props
 	wall   []bool // walls only (doors '=' excluded)
 	propAt map[int]*Prop
+	doorAt map[int]*Door
 }
 
 // Parse builds a level from equal-width rows.
@@ -71,7 +91,7 @@ func Parse(rows []string) (*Level, error) {
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("empty map")
 	}
-	l := &Level{W: len(rows[0]), H: len(rows), Rows: rows, propAt: map[int]*Prop{}}
+	l := &Level{W: len(rows[0]), H: len(rows), Rows: rows, propAt: map[int]*Prop{}, doorAt: map[int]*Door{}}
 	l.solid = make([]bool, l.W*l.H)
 	l.wall = make([]bool, l.W*l.H)
 	foundStart := false
@@ -84,13 +104,22 @@ func Parse(rows []string) (*Level, error) {
 			i := y*l.W + x
 			feet := geom.V(float64(x*T+12), float64(y*T+16))
 			switch {
-			case c == '=':
-				// open door: drawn as a wall face but passable
+			case (c == 'D' || c == '=') && y+1 < l.H && !isWallChar(rows[y+1][x]):
+				d := &Door{TX: x, TY: y, Inner: y > 0 && !isWallChar(rows[y-1][x])}
+				l.Doors = append(l.Doors, d)
+				l.doorAt[i] = d
+				open := 0.0
+				if c == '=' {
+					open = 1
+				}
+				l.SetDoorOpen(d, open)
 			case isWallChar(c):
 				l.solid[i], l.wall[i] = true, true
 			case c == '@':
 				l.Start, foundStart = feet, true
-			case c == 'C' || c == 'S' || c == 'R':
+			case c == 'Q':
+				l.Boss = feet
+			case strings.IndexByte("CSREG", c) >= 0:
 				l.Spawns = append(l.Spawns, Spawn{Kind: c, Pos: feet})
 			}
 			if name, ok := propChars[c]; ok {
@@ -238,6 +267,23 @@ func (l *Level) PropAt(p geom.Vec) *Prop {
 		return nil
 	}
 	return pr
+}
+
+// DoorAt returns the door in tile (x, y), if any.
+func (l *Level) DoorAt(x, y int) *Door { return l.doorAt[y*l.W+x] }
+
+// SetDoorOpen moves a door to open (0..1) and updates what it blocks.
+func (l *Level) SetDoorOpen(d *Door, open float64) {
+	d.Open = open
+	i := d.TY*l.W + d.TX
+	l.solid[i] = open < DoorOpenAt
+	l.wall[i] = l.solid[i]
+}
+
+// pathable is SolidTile for path finding: doors count as open, since they
+// open for whoever walks up to them.
+func (l *Level) pathable(x, y int) bool {
+	return !l.SolidTile(x, y, false) || l.doorAt[y*l.W+x] != nil
 }
 
 // RemoveProp makes a prop disappear and stop blocking.

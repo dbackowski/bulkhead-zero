@@ -384,8 +384,64 @@ def weapon_shotgun():
                         "pellets": 5, "recoil_px": 3, "bullet_speed": 400, "damage": 1}
 
 
+def weapon_smg():
+    w = new(24, 12)
+    rect(w, 1, 5, 4, 5, G0)                  # wire stock
+    rect(w, 1, 7, 4, 7, G0)
+    rect(w, 1, 5, 1, 7, G0)
+    rect(w, 5, 4, 15, 6, G1)                 # receiver
+    rect(w, 5, 4, 15, 4, G2)
+    rect(w, 16, 5, 18, 5, G0)                # short barrel
+    rect(w, 11, 7, 12, 10, G0)               # long thin magazine
+    put(w, 12, 10, G1)
+    rect(w, 13, 3, 14, 3, G0)                # sight
+    put(w, 9, 5, CY)
+    _glove(w, 6, 7)
+    return outline(w), {"pivot": [6, 7], "muzzle": [19, 5], "fire_ms": 70, "spread_deg": 7,
+                        "pellets": 1, "recoil_px": 1, "bullet_speed": 400, "damage": 1}
+
+
+def weapon_plasma():
+    w = new(24, 12)
+    rect(w, 1, 5, 4, 8, G0)                  # stock
+    rect(w, 1, 5, 4, 5, G1)
+    rect(w, 4, 4, 14, 7, G1)                 # body
+    rect(w, 4, 4, 14, 4, G2)
+    for x in (8, 10, 12):                    # glowing coils
+        rect(w, x, 3, x, 7, CY_D)
+        put(w, x, 3, CY)
+        put(w, x, 5, CY)
+    rect(w, 15, 5, 19, 6, G2)                # emitter
+    rect(w, 15, 6, 19, 6, G1)
+    rect(w, 20, 4, 21, 7, G1)                # muzzle ring
+    put(w, 21, 5, CY)
+    put(w, 21, 6, CY_D)
+    _glove(w, 6, 8)
+    return outline(w), {"pivot": [6, 8], "muzzle": [22, 5], "fire_ms": 300, "spread_deg": 1,
+                        "pellets": 1, "recoil_px": 2, "bullet_speed": 330, "damage": 3,
+                        "pierce": 3, "projectile": "plasma"}
+
+
+def weapon_launcher():
+    w = new(24, 12)
+    rect(w, 3, 3, 20, 7, G1)                 # fat tube
+    rect(w, 3, 3, 20, 3, G2)
+    rect(w, 3, 7, 20, 7, G0)
+    rect(w, 21, 3, 21, 7, G0)                # open muzzle
+    rect(w, 14, 3, 15, 7, AMB)               # hazard band
+    put(w, 14, 5, AMB_D)
+    rect(w, 9, 2, 12, 2, G0)                 # sight rail
+    rect(w, 5, 8, 6, 10, G0)                 # grip
+    rect(w, 10, 8, 13, 9, G0)                # foregrip
+    _glove(w, 7, 8)
+    return outline(w), {"pivot": [7, 8], "muzzle": [22, 5], "fire_ms": 750, "spread_deg": 2,
+                        "pellets": 1, "recoil_px": 3, "bullet_speed": 240, "damage": 5,
+                        "blast": 40, "projectile": "grenade", "semi_auto": True}
+
+
 def weapons():
-    return {"rifle": weapon_rifle(), "pistol": weapon_pistol(), "shotgun": weapon_shotgun()}
+    return {"rifle": weapon_rifle(), "pistol": weapon_pistol(), "shotgun": weapon_shotgun(),
+            "smg": weapon_smg(), "plasma": weapon_plasma(), "launcher": weapon_launcher()}
 
 
 def player_fx():
@@ -610,6 +666,197 @@ def drone_anims():
 
 
 # ============================================================================
+# ENEMY 4 - Bomber (a crawler bloated with volatile acid). Faces right; mirror
+# for left. Runs at the player, swells up and bursts; shooting it sets it off too.
+# ============================================================================
+GLOW = [(150, 80, 36, 255), (232, 110, 40, 255), FLASH2, FLASH1]
+
+
+def bomber(leg_phase=0, bob=0, swell=0.0, glow=0):
+    body = new()
+    cy = 14 + bob
+    for i, lx in enumerate((8, 12, 15)):           # far legs
+        swing = 2 if (i + leg_phase) % 2 else -1
+        line(body, lx, cy + 2, lx + swing - 1, 20, X0)
+    r = 5.5 + swell                                  # the sac
+    sy = cy - 2 - swell * .5
+    ellipse(body, 9, sy, r, r * .85, X1)
+    ellipse(body, 9, sy - .5, r - 1.6, (r - 1.6) * .8, GLOW[glow])
+    ellipse(body, 8, sy - 1.5, (r - 1.6) * .5, (r - 1.6) * .35, GLOW[min(glow + 1, 3)])
+    line(body, 6, sy - r * .6, 7, sy + r * .5, X1)   # veins
+    line(body, 11, sy - r * .7, 12, sy + r * .4, X1)
+    hx, hy = 16, cy + 1                              # small head
+    ellipse(body, hx - 2, hy, 2.5, 2, X1)
+    ellipse(body, hx, hy, 2.6, 2, X2)
+    put(body, hx + 1, hy - 1, ACID)
+    line(body, hx + 2, hy + 1, hx + 4, hy + 2, BONE)
+    for i, lx in enumerate((9, 13, 16)):           # near legs
+        swing = -2 if (i + leg_phase) % 2 else 1
+        line(body, lx, cy + 2, lx + swing + 1, 20, X2)
+        put(body, lx + swing + 1, 20, X3)
+    return outline(body)
+
+
+def bomber_anims():
+    a = {}
+    a["walk_right"] = [with_shadow(bomber(leg_phase=p, bob=b, glow=g), rx=7)
+                       for p, b, g in ((0, 0, 0), (1, -1, 1), (0, 0, 0), (1, -1, 1))]
+    a["attack_right"] = [with_shadow(bomber(swell=1, glow=1), rx=7),
+                         with_shadow(bomber(swell=1.6, glow=2), rx=7),
+                         with_shadow(tint(bomber(swell=2.2, glow=3), WHITE, .6), rx=7)]
+    goo = new()
+    rng = random.Random(11)
+    ellipse(goo, 12, 19, 8, 2.4, X0)
+    ellipse(goo, 11, 19, 5, 1.4, (150, 80, 36, 255))
+    for _ in range(10):
+        ang = rng.random() * math.tau
+        put(goo, 12 + math.cos(ang) * rng.uniform(6, 10), 19 + math.sin(ang) * rng.uniform(1.5, 3.5), X1)
+    a["death"] = [goo, fade(goo, .8)]
+    return a
+
+
+# ============================================================================
+# ENEMY 5 - Brute (armoured, slow, charges). Faces right; mirror for left.
+# ============================================================================
+def brute(step=0, bob=0, lean=0, arm=0, mouth=0):
+    body = new()
+    by = 11 + bob
+    rect(body, 7 + step, by + 4, 9 + step, 20, X0)            # far leg
+    rect(body, 6 + step, 19, 9 + step, 20, X0)
+    ellipse(body, 11 + lean, by + 1, 7.5, 6.5, X1)            # hunched torso
+    ellipse(body, 10 + lean, by - 1, 6, 4, X2)
+    ellipse(body, 9 + lean, by - 2.5, 3, 1.5, X3)
+    for px, py in ((5, by - 3), (8, by - 5), (12, by - 5)):  # bone plates on the back
+        ellipse(body, px + lean, py, 2.2, 1.5, BONE)
+        put(body, px + lean, py + 1, M0)
+    rect(body, 12 - step, by + 5, 14 - step, 20, X1)          # near leg
+    rect(body, 12 - step, 19, 15 - step, 20, X0)
+    put(body, 13 - step, by + 7, X2)
+    hx, hy = 17 + lean, by + 2                                 # low head
+    ellipse(body, hx, hy, 3, 2.5, X2)
+    put(body, hx + 1, hy - 1, RED)
+    put(body, hx + 2, hy - 1, RED)
+    if mouth:
+        rect(body, hx, hy + 1, hx + 3, hy + 1 + mouth, RED_DD)
+        put(body, hx + 1, hy + 1, BONE); put(body, hx + 3, hy + 1, BONE)
+    else:
+        line(body, hx, hy + 1, hx + 3, hy + 1, X0)
+    sx, sy = 13 + lean, by                                     # big arm and claw
+    ex, ey = 18 + lean + arm, by + 5 - arm * 2
+    line(body, sx, sy, ex, ey, X2)
+    line(body, sx, sy + 1, ex, ey + 1, X1)
+    for dx, dy in ((2, -1), (2, 1), (1, 2)):
+        line(body, ex, ey, ex + dx, ey + dy, BONE)
+    return outline(body)
+
+
+def brute_anims():
+    a = {}
+    a["walk_right"] = [with_shadow(brute(step=s, bob=b), rx=9)
+                       for s, b in ((0, 0), (1, -1), (0, 0), (-1, -1))]
+    a["attack_right"] = [                                       # 0-1 wind-up, 2-3 charge
+        with_shadow(brute(lean=-2, arm=-1, mouth=1), rx=9),
+        with_shadow(brute(lean=-3, arm=-1, mouth=2, bob=1), rx=9),
+        with_shadow(brute(lean=2, arm=2, mouth=2, step=1), rx=9),
+        with_shadow(brute(lean=3, arm=2, mouth=2, step=-1, bob=-1), rx=9),
+    ]
+    alive = brute()
+    lying = shift(alive.rotate(-90, resample=Image.NEAREST), 2, 4)
+    pool = new()
+    ellipse(pool, 12, 19, 10, 3, RED_DD)
+    ellipse(pool, 13, 19, 6, 1.6, RED_D)
+    a["death"] = [
+        with_shadow(tint(alive, WHITE, .85), rx=9),
+        with_shadow(shift(brute(lean=-2, mouth=2), 0, 1), rx=9),
+        with_shadow(lying, rx=10),
+        Image.alpha_composite(pool, lying),
+    ]
+    return a
+
+
+# ============================================================================
+# BOSS - Brood Mother, 48x48 frames (feet at 24, 45). Faces the camera.
+# ============================================================================
+B = 48
+
+
+def boss_shadow(sprite, rx=17):
+    base = new(B, B)
+    ellipse(base, 24, 45, rx, 3, SHADOW)
+    base.alpha_composite(sprite)
+    return base
+
+
+def boss(breath=0, leg=0, maw=0, rear=0, glow=0, burst=False):
+    img = new(B, B)
+    cy = 26 - rear + breath
+    for i, (x0, x1) in enumerate(((14, 5), (18, 9), (30, 39), (34, 43))):   # far legs
+        k = (leg if i % 2 else -leg)
+        line(img, x0, cy + 4, (x0 + x1) / 2 + k, cy - 6, X0)
+        line(img, (x0 + x1) / 2 + k, cy - 6, x1 + k, 44, X0)
+    ellipse(img, 24, cy - 2, 15, 11 + breath * .5, X1)                       # abdomen
+    ellipse(img, 22, cy - 5, 11, 6, X2)
+    ellipse(img, 19, cy - 8, 5, 2, X3)
+    for sx in (16, 24, 32):
+        line(img, sx, cy - 12, sx + 1, cy + 7, X0)
+    if not burst:                                                         # egg sacs
+        for sx, sy, r in ((14, cy - 1, 3.2), (24, cy - 9, 3.6), (33, cy - 2, 3.0)):
+            ellipse(img, sx, sy, r + glow * .4, r * .85 + glow * .3, ACID_D)
+            ellipse(img, sx - .6, sy - .6, (r + glow * .4) * .6, r * .45, ACID)
+            put(img, sx - 1, sy - 1, ACID_L)
+    else:
+        for sx, sy in ((14, cy - 1), (24, cy - 9), (33, cy - 2)):
+            ellipse(img, sx, sy, 2.5, 1.5, M0)
+            put(img, sx, sy - 2, ACID_D)
+    hy = cy + 9                                                          # head
+    ellipse(img, 24, hy, 10.5, 7.5, OUT)
+    ellipse(img, 24, hy, 9, 6, X1)
+    ellipse(img, 24, hy - 1, 7.5, 4.5, X2)
+    for hx in (17, 31):                                                  # horns
+        line(img, hx, hy - 3, hx + (-3 if hx < 24 else 3), hy - 9 - rear, BONE)
+    for ex in (19, 22, 26, 29):
+        put(img, ex, hy - 2 + (1 if ex in (19, 29) else 0), FLASH2 if glow else AMB)
+    if maw:
+        ellipse(img, 24, hy + 2, 3 + maw, 1 + maw, RED_DD)
+        for tx in range(21 - maw, 28 + maw, 2):
+            put(img, tx, hy + 1, BONE)
+        if maw > 1:
+            put(img, 24, hy + 3 + maw, ACID)
+    else:
+        line(img, 20, hy + 2, 28, hy + 2, X0)
+    for i, (x0, sgn) in enumerate(((16, -1), (32, 1))):                 # scythe arms
+        mx, my = x0 + sgn * 6, hy - 2 - rear * 2
+        line(img, x0, hy, mx, my, X2)
+        line(img, x0, hy + 1, mx, my + 1, X1)
+        line(img, mx, my, mx + sgn * 2, 43 - rear * 3 + (leg if i else -leg), BONE)
+    return outline(img)
+
+
+def boss_anims():
+    a = {}
+    a["idle"] = [boss_shadow(boss(breath=b, leg=l)) for b, l in ((0, 0), (1, 1), (1, 0), (0, -1))]
+    a["attack"] = [boss_shadow(boss(rear=r, maw=m, glow=g))
+                   for r, m, g in ((1, 1, 0), (3, 2, 1), (3, 3, 1), (1, 1, 0))]
+    flat = new(B, B)
+    ellipse(flat, 24, 40, 19, 5, X0)
+    ellipse(flat, 24, 39, 15, 3.5, X1)
+    ellipse(flat, 18, 41, 4, 1.4, ACID_D)
+    ellipse(flat, 31, 40, 3, 1, ACID)
+    dead = boss(burst=True, maw=3)
+    sunk = new(B, B)
+    sunk.alpha_composite(dead.resize((B, 30), Image.NEAREST), (0, 16))
+    a["death"] = [
+        boss_shadow(tint(boss(rear=3, maw=3, glow=1), WHITE, .85)),
+        boss_shadow(boss(rear=4, maw=3, glow=1, breath=-1)),
+        boss_shadow(dead),
+        Image.alpha_composite(flat, sunk),
+        Image.alpha_composite(flat, fade(sunk, .6)),
+        outline(flat),
+    ]
+    return a
+
+
+# ============================================================================
 # FX - projectiles and impacts (game rotates bullets/lasers to their heading)
 # ============================================================================
 def fx_anims():
@@ -631,6 +878,30 @@ def fx_anims():
         line(img, 7, 12, 19, 12, (255, 200, 190, 255))
         l.append(img)
     a["laser"] = l
+    a["plasma"] = []
+    for k in (0, 1):
+        img = new()
+        ellipse(img, 12, 12, 5 + k, 2.2, CY_D)
+        ellipse(img, 13, 12, 3.5 + k, 1.2, CY)
+        line(img, 11, 12, 16, 12, WHITE)
+        put(img, 6 - k, 12, CY_D)
+        a["plasma"].append(img)
+    a["grenade"] = []
+    for k in (0, 1):
+        img = new()
+        ellipse(img, 12, 12, 2.6, 2.4, G1)
+        put(img, 11, 11, G3)
+        put(img, 13, 12, RED if k else AMB)
+        a["grenade"].append(outline(img))
+    a["spine"] = []
+    for k in (0, 1):
+        img = new()
+        line(img, 7, 12, 16, 12, BONE)
+        line(img, 7, 11, 11, 11, X2)
+        line(img, 7, 13, 11, 13, X1)
+        rect(img, 17, 12, 18, 12, ACID if k else ACID_L)
+        put(img, 5 - k, 12, ACID_D)
+        a["spine"].append(outline(img))
     a["hit_spark"] = []
     for s in (3, 2, 1):
         img = new()
@@ -676,7 +947,7 @@ def fx_anims():
 TIMING_MS = {  # per-frame durations used by the game and by the previews
     "idle": 180, "walk": 110, "hurt": 80, "death": 130, "attack": 90,
     "bullet": 50, "laser": 50, "hit_spark": 50, "acid_glob": 90, "acid_splash": 80, "explosion": 70,
-    "muzzle_flash": 40, "crosshair": 300,
+    "muzzle_flash": 40, "crosshair": 300, "plasma": 60, "grenade": 100, "spine": 80,
 }
 
 
@@ -696,6 +967,9 @@ def build_all():
         "crawler": crawler_anims(),
         "spitter": spitter_anims(),
         "drone": drone_anims(),
+        "bomber": bomber_anims(),
+        "brute": brute_anims(),
+        "boss": boss_anims(),
         "fx": fx,
     }
 
@@ -703,18 +977,20 @@ def build_all():
 ONE_SHOT = ("death", "hurt", "attack", "splash", "explosion", "spark", "muzzle")
 
 
-def write_sheet(path, groups):
-    """groups: list of (prefix, anims dict). One animation per row."""
+def write_sheet(path, groups, size=F):
+    """groups: list of (prefix, anims dict). One animation per row of size x size frames."""
     rows = [(f"{p}{name}", frames) for p, anims in groups for name, frames in anims.items()]
     cols = max(len(f) for _, f in rows)
-    sheet = Image.new("RGBA", (cols * F, len(rows) * F), CLEAR)
+    sheet = Image.new("RGBA", (cols * size, len(rows) * size), CLEAR)
     meta = {}
     for r, (name, frames) in enumerate(rows):
         for c, fr in enumerate(frames):
-            sheet.alpha_composite(fr, (c * F, r * F))
+            sheet.alpha_composite(fr, (c * size, r * size))
         short = name.split(".")[-1]
         meta[name] = {"row": r, "frames": len(frames), "frame_ms": timing_for(short),
                       "loop": not any(k in short for k in ONE_SHOT)}
+        if size != F:
+            meta[name]["size"] = size
         if short.startswith("idle_"):
             meta[name]["bob"] = IDLE_BOB
         elif short.startswith("walk_") and name.count(".") == 0:
@@ -739,13 +1015,16 @@ def main():
     w_sheet, w_meta = write_weapons("weapons.png", all_["weapons"])
     e_sheet, e_meta = write_sheet("enemies.png", [("crawler.", all_["crawler"]),
                                                   ("spitter.", all_["spitter"]),
-                                                  ("drone.", all_["drone"])])
+                                                  ("drone.", all_["drone"]),
+                                                  ("bomber.", all_["bomber"]),
+                                                  ("brute.", all_["brute"])])
+    b_sheet, b_meta = write_sheet("boss.png", [("", all_["boss"])], size=B)
     f_sheet, f_meta = write_sheet("fx.png", [("", all_["fx"])])
     with open("sprites.json", "w") as f:
         json.dump({
             "frame_size": F,
             "notes": {
-                "origin": "Feet/ground contact is at roughly (12, 21) in every 24x24 frame.",
+                "origin": "Feet/ground contact is at roughly (12, 21) in every 24x24 frame; (size/2, size-3) for bigger frames (\"size\").",
                 "mirror": "Only *_right facings are drawn. For *_left use the *_right frames flipped horizontally (enemies too).",
                 "fx": "bullet and laser point right; rotate them to the projectile heading.",
                 "loop": "loop=false animations play once, then hold (death) or return to idle.",
@@ -759,11 +1038,11 @@ def main():
                 "weapon_draw": "translate(-pivot) -> if aiming left (cos<0) scale(1,-1) -> rotate(angle) -> translate(hand). Pull back by recoil_px along the aim for ~60ms after a shot.",
                 "muzzle_world": "hand + rotate((muzzle - pivot) with y negated when aiming left, angle)",
             },
-            "sheets": {"player.png": p_meta, "enemies.png": e_meta, "fx.png": f_meta},
+            "sheets": {"player.png": p_meta, "enemies.png": e_meta, "fx.png": f_meta, "boss.png": b_meta},
             "weapons.png": w_meta,
         }, f, indent=2)
     # viewing copy
-    sheets = (p_sheet, w_sheet, e_sheet, f_sheet)
+    sheets = (p_sheet, w_sheet, e_sheet, f_sheet, b_sheet)
     w = max(s.width for s in sheets)
     h = sum(s.height for s in sheets) + 3 * F
     view = Image.new("RGBA", (w, h), (34, 38, 50, 255))

@@ -18,8 +18,9 @@ const (
 	invulnTime   = 0.45
 )
 
-// Slot order for keys 1/2/3.
-var weaponOrder = []string{"rifle", "shotgun", "pistol"}
+// Slot order for keys 1-6. The first three are there from the start; each
+// cleared wave unlocks the next.
+var weaponOrder = []string{"rifle", "shotgun", "pistol", "smg", "plasma", "launcher"}
 
 // Player is the marine. Pos is the feet position.
 type Player struct {
@@ -112,11 +113,11 @@ func (g *Game) updatePlayer(in Input) {
 	}
 
 	// weapons
-	if in.SelectSlot >= 0 && in.SelectSlot < len(g.weapons) {
+	if in.SelectSlot >= 0 && in.SelectSlot < g.unlocked {
 		p.Slot = in.SelectSlot
 	}
 	if in.Cycle != 0 {
-		p.Slot = (p.Slot + in.Cycle + len(g.weapons)) % len(g.weapons)
+		p.Slot = (p.Slot + in.Cycle + g.unlocked) % g.unlocked
 	}
 
 	// movement
@@ -160,7 +161,7 @@ func (g *Game) fire(w *gfx.Weapon) {
 	for i := 0; i < w.Pellets; i++ {
 		a := p.Aim
 		speed := w.BulletSpeed
-		life := 0.9
+		life := 0.9 // the launcher's grenade bursts at the end of this
 		if w.Pellets > 1 {
 			a += -spread + 2*spread*float64(i)/float64(w.Pellets-1) + (g.rng.Float64()*2-1)*0.04
 			speed *= 0.9 + g.rng.Float64()*0.2
@@ -175,14 +176,17 @@ func (g *Game) fire(w *gfx.Weapon) {
 			Life:   life,
 			Dmg:    w.Damage,
 			Rot:    a,
+			Anim:   w.Projectile,
+			Pierce: w.Pierce,
+			Blast:  w.Blast,
 		})
 	}
 	g.spawnFX("fx.muzzle_flash", muzzle, 0)
 	g.sound(w.Name, muzzle)
 	switch w.Name {
-	case "shotgun":
+	case "shotgun", "launcher":
 		g.shake(2.5, 0.12)
-	case "pistol":
+	case "pistol", "plasma":
 		g.shake(1, 0.06)
 	}
 }

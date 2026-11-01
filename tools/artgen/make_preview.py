@@ -369,7 +369,7 @@ def showcase():
     cells = []
     for name, frames in A["player"].items():
         cells.append((name, frames, ms.timing_for(name)))
-    for group in ("crawler", "spitter", "drone"):
+    for group in ("crawler", "spitter", "drone", "bomber", "brute", "boss"):
         for name, frames in A[group].items():
             cells.append((f"{group} {name.replace('_right', '')}", frames, ms.timing_for(name)))
     for name, frames in A["fx"].items():
@@ -393,7 +393,7 @@ def showcase():
         fr = bg.copy()
         for i, (label, frames, ms_) in enumerate(cells):
             n = len(frames)
-            looping = n > 1 and any(k in label for k in ("idle", "walk", "bullet", "laser", "glob", "crosshair"))
+            looping = n > 1 and any(k in label for k in ("idle", "walk", "bullet", "laser", "glob", "crosshair", "plasma", "grenade", "spine"))
             cycle = n * ms_ + (0 if looping else 500)
             im = frames[min(n - 1, int((t % cycle) // ms_))]
             x, y = (i % cols) * cw + 8, (i // cols) * ch + 4

@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"image/color"
+	"math"
 	"strings"
 
 	"github.com/dbackowski/bulkhead-zero/internal/gfx"
@@ -16,6 +17,7 @@ var (
 	hudLine   = color.RGBA{70, 214, 230, 255}
 	hpFull    = color.RGBA{232, 68, 60, 255}
 	hpEmpty   = color.RGBA{60, 24, 30, 255}
+	bossHP    = color.RGBA{150, 232, 60, 255}
 	dimScreen = color.RGBA{0, 0, 0, 150}
 )
 
@@ -47,8 +49,26 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 	dst.DrawImage(w.Img, op)
 	ebitenutil.DebugPrintAt(dst, fmt.Sprintf("%d %s", p.Slot+1, strings.ToUpper(w.Name)), 96, ScreenH-21)
 
-	// hostiles counter, top-left
-	ebitenutil.DebugPrintAt(dst, fmt.Sprintf("HOSTILES %d/%d", g.aliveFoes(), g.totalFoes), 4, 2)
+	// wave and hostiles, top-left; the boss gets a health bar instead
+	if b := g.boss; b != nil {
+		ebitenutil.DebugPrintAt(dst, "BROOD MOTHER", ScreenW/2-36, 2)
+		vector.FillRect(dst, ScreenW/2-80, 18, 160, 6, hpEmpty, false)
+		vector.FillRect(dst, ScreenW/2-80, 18, 160*float32(max(b.HP, 0))/float32(stats[boss].hp), 6, bossHP, false)
+		vector.StrokeRect(dst, ScreenW/2-81, 17, 162, 8, 1, hudLine, false)
+	} else {
+		ebitenutil.DebugPrintAt(dst, fmt.Sprintf("WAVE %d/%d  HOSTILES %d/%d", g.wave, g.waveCount(),
+			g.aliveFoes()+len(g.queue), g.totalFoes), 4, 2)
+	}
+	if g.state == statePlaying && g.bannerT > 0 {
+		printCentered(dst, g.banner, 60)
+	}
+	if g.state == statePlaying && g.nextIn > 0 && g.aliveFoes() == 0 && len(g.queue) == 0 {
+		next := fmt.Sprintf("WAVE %d", g.wave+1)
+		if g.wave == g.waveCount() {
+			next = "SOMETHING BIG"
+		}
+		printCentered(dst, fmt.Sprintf("%s IN %d", next, int(math.Ceil(g.nextIn))), 100)
+	}
 
 	// crosshair at the cursor
 	if g.state == statePlaying {
@@ -62,7 +82,7 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 	switch g.state {
 	case statePlaying:
 		if g.t < 7 {
-			printCentered(dst, "WASD MOVE  MOUSE AIM  LMB FIRE\n1-3 / Q / WHEEL WEAPON  ESC PAUSE", 40)
+			printCentered(dst, "WASD MOVE  MOUSE AIM  LMB FIRE\n1-6 / Q / WHEEL WEAPON  ESC PAUSE", 40)
 		}
 	case statePaused:
 		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
@@ -72,6 +92,6 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 		printCentered(dst, "YOU DIED\n\nR OR CLICK TO TRY AGAIN", 110)
 	case stateClear:
 		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
-		printCentered(dst, "DECK CLEARED\n\nR OR CLICK TO PLAY AGAIN", 110)
+		printCentered(dst, "BROOD MOTHER DEAD - DECK CLEARED\n\nR OR CLICK TO PLAY AGAIN", 110)
 	}
 }

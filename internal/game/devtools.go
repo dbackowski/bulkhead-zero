@@ -106,9 +106,10 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		in.FirePressed = onTarget && int(a.t*60)%14 == 0
 	}
 
-	// movement: back off from close crawlers, strafe while shooting, otherwise hunt
+	// movement: back off from close melee enemies, strafe while shooting, otherwise hunt
+	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, boss: 60}
 	switch {
-	case vis != nil && vis.Kind == crawler && dv < 40:
+	case vis != nil && dv < backOff[vis.Kind]:
 		in.Move = p.Pos.Sub(vis.Pos).Norm().Add(geom.V(math.Sin(a.t*2), 0).Scale(0.6))
 	case vis != nil:
 		to := vis.Pos.Sub(p.Pos).Norm()

@@ -30,7 +30,7 @@ func (l *Level) DistanceField(target geom.Vec) []int {
 		x, y := i%l.W, i/l.W
 		for _, d := range [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
 			nx, ny := x+d[0], y+d[1]
-			if l.SolidTile(nx, ny, false) {
+			if !l.pathable(nx, ny) {
 				continue
 			}
 			j := ny*l.W + nx
@@ -59,10 +59,10 @@ func (l *Level) NextStep(field []int, pos geom.Vec) (geom.Vec, bool) {
 	for dy := -1; dy <= 1; dy++ {
 		for dx := -1; dx <= 1; dx++ {
 			nx, ny := x+dx, y+dy
-			if (dx == 0 && dy == 0) || l.SolidTile(nx, ny, false) {
+			if (dx == 0 && dy == 0) || !l.pathable(nx, ny) {
 				continue
 			}
-			if dx != 0 && dy != 0 && (l.SolidTile(x+dx, y, false) || l.SolidTile(x, y+dy, false)) {
+			if dx != 0 && dy != 0 && (!l.pathable(x+dx, y) || !l.pathable(x, y+dy)) {
 				continue
 			}
 			if v := field[ny*l.W+nx]; v < best {

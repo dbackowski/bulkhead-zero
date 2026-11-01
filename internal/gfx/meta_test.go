@@ -15,8 +15,11 @@ func TestSpriteMetaHasWhatTheGameUses(t *testing.T) {
 	need := map[string][]string{
 		"player.png": {"death"},
 		"enemies.png": {"crawler.walk_right", "crawler.attack_right", "crawler.death",
-			"spitter.idle", "spitter.attack", "spitter.death", "drone.idle", "drone.attack", "drone.death"},
-		"fx.png": {"bullet", "laser", "hit_spark", "acid_glob", "acid_splash", "explosion", "muzzle_flash", "crosshair"},
+			"spitter.idle", "spitter.attack", "spitter.death", "drone.idle", "drone.attack", "drone.death",
+			"bomber.walk_right", "bomber.attack_right", "bomber.death", "brute.walk_right", "brute.attack_right", "brute.death"},
+		"boss.png": {"idle", "attack", "death"},
+		"fx.png": {"bullet", "laser", "hit_spark", "acid_glob", "acid_splash", "explosion", "muzzle_flash", "crosshair",
+			"plasma", "grenade", "spine"},
 	}
 	for _, f := range []string{"down", "down_right", "right", "up_right", "up"} {
 		need["player.png"] = append(need["player.png"], "idle_"+f, "walk_"+f, "hurt_"+f)
@@ -28,7 +31,7 @@ func TestSpriteMetaHasWhatTheGameUses(t *testing.T) {
 			}
 		}
 	}
-	for _, w := range []string{"rifle", "shotgun", "pistol"} {
+	for _, w := range []string{"rifle", "shotgun", "pistol", "smg", "plasma", "launcher"} {
 		if _, ok := m.Weapons[w]; !ok {
 			t.Errorf("missing weapon %q", w)
 		}
