@@ -444,6 +444,7 @@ func (g *Game) kill(e *Enemy) {
 	e.DeadT = 0
 	g.kills++
 	g.sound(deathSound[e.Kind], e.Pos)
+	g.maybeDrop(e)
 	switch e.Kind {
 	case drone:
 		g.spawnFX("fx.explosion", e.Pos.Sub(geom.V(0, 12)), 0)

@@ -1,6 +1,7 @@
 package gfx
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dbackowski/bulkhead-zero/assets"
@@ -34,6 +35,11 @@ func TestSpriteMetaHasWhatTheGameUses(t *testing.T) {
 	for _, w := range []string{"rifle", "shotgun", "pistol", "smg", "plasma", "launcher"} {
 		if _, ok := m.Weapons[w]; !ok {
 			t.Errorf("missing weapon %q", w)
+		}
+	}
+	for _, c := range "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,:!?-+/[]" { // what the HUD writes
+		if !strings.ContainsRune(m.Font.Chars, c) {
+			t.Errorf("font is missing %q", c)
 		}
 	}
 	if len(m.Player.Facings) != 8 || len(m.Player.HandAnchor) != 8 {

@@ -33,6 +33,17 @@ type WeaponMeta struct {
 	Pierce      int     `json:"pierce"`     // enemies a shot passes through before stopping
 	Blast       float64 `json:"blast"`      // explosion radius in px (0 = plain bullet)
 	Projectile  string  `json:"projectile"` // fx animation, default "bullet"
+	Mag         int     `json:"mag"`        // rounds per magazine
+	ReloadMS    int     `json:"reload_ms"`
+	Ammo        int     `json:"ammo"` // most spare rounds carried; 0 = unlimited
+}
+
+// FontMeta describes font.png: one row of outlined glyph cells in Chars order.
+type FontMeta struct {
+	Chars       string `json:"chars"`
+	Cell        [2]int `json:"cell"`
+	Advance     int    `json:"advance"`
+	GlyphOrigin [2]int `json:"glyph_origin"` // top-left of the glyph inside its cell
 }
 
 // PlayerMeta holds the detached-gun aiming data.
@@ -48,6 +59,7 @@ type SpriteMeta struct {
 	Player    PlayerMeta                     `json:"player"`
 	Sheets    map[string]map[string]AnimMeta `json:"sheets"`
 	Weapons   map[string]WeaponMeta          `json:"weapons.png"`
+	Font      FontMeta                       `json:"font.png"`
 }
 
 // TileMeta mirrors assets/tiles/tiles.json.

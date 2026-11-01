@@ -81,6 +81,8 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 		}
 	}
 
+	g.drawPickups(dst, cam)
+
 	// corpses lie under everything that is still alive
 	var list []drawable
 	for _, e := range g.enemies {

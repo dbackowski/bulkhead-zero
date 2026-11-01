@@ -70,6 +70,9 @@ type Weapon struct {
 	Pierce      int
 	Blast       float64
 	Projectile  string // fx animation name, e.g. "fx.bullet"
+	Mag         int
+	ReloadMS    float64
+	Ammo        int // most spare rounds; 0 = unlimited
 }
 
 // Library holds every loaded image and animation.
@@ -82,6 +85,7 @@ type Library struct {
 	HandAnchor map[string]geom.Vec
 	GunBehind  map[string]bool
 	Facings    []string
+	Font       *Font
 }
 
 // A returns an animation by name and panics if it doesn't exist (a typo is a bug).
@@ -193,6 +197,9 @@ func Load(fsys fs.FS) (*Library, error) {
 			Pierce:      w.Pierce,
 			Blast:       w.Blast,
 			Projectile:  "fx." + cmp.Or(w.Projectile, "bullet"),
+			Mag:         max(w.Mag, 1),
+			ReloadMS:    float64(w.ReloadMS),
+			Ammo:        w.Ammo,
 		}
 	}
 	for f, a := range sm.Player.HandAnchor {
@@ -200,6 +207,16 @@ func Load(fsys fs.FS) (*Library, error) {
 	}
 	for _, f := range sm.Player.GunBehindBody {
 		lib.GunBehind[f] = true
+	}
+
+	fimg, err := loadImage(fsys, "sprites/font.png")
+	if err != nil {
+		return nil, err
+	}
+	fm := sm.Font
+	lib.Font = &Font{glyphs: map[rune]*ebiten.Image{}, advance: fm.Advance, height: fm.Cell[1] - 2*fm.GlyphOrigin[1], origin: fm.GlyphOrigin}
+	for i, c := range fm.Chars {
+		lib.Font.glyphs[c] = sub(fimg, i*fm.Cell[0], 0, fm.Cell[0], fm.Cell[1])
 	}
 
 	timg, err := loadImage(fsys, "tiles/tileset.png")

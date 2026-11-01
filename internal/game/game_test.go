@@ -193,3 +193,63 @@ func TestDoorOpensForPlayer(t *testing.T) {
 		t.Fatalf("door should be shut, at %.2f", d.Open)
 	}
 }
+
+// Emptying the rifle starts a reload that refills the magazine from the spare
+// rounds; with no spare rounds left the gun stays empty.
+func TestReload(t *testing.T) {
+	g, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.enemies = nil
+	p, w := g.player, g.weapons[0]
+	hold := Input{SelectSlot: -1, Fire: true}
+	for i := 0; i < 600 && p.ReloadT == 0; i++ {
+		g.updatePlayer(hold)
+	}
+	if p.Mag[0] != 0 || p.ReloadT == 0 {
+		t.Fatalf("expected an empty, reloading rifle: mag %d, reload %.2f", p.Mag[0], p.ReloadT)
+	}
+	for i := 0; i < int(w.ReloadMS/1000*60)+2; i++ {
+		g.updatePlayer(Input{SelectSlot: -1})
+	}
+	if p.Mag[0] != w.Mag || p.Spare[0] != w.Ammo-w.Mag {
+		t.Fatalf("after reload: mag %d spare %d, want %d and %d", p.Mag[0], p.Spare[0], w.Mag, w.Ammo-w.Mag)
+	}
+	p.Mag[0], p.Spare[0] = 0, 0
+	g.updatePlayer(Input{SelectSlot: -1, Reload: true})
+	if p.ReloadT != 0 || g.canReload(0) {
+		t.Fatal("reloaded with no spare rounds")
+	}
+}
+
+func TestPickups(t *testing.T) {
+	g, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := g.player
+	g.pickups = []*Pickup{{Kind: pickHealth, Pos: p.Pos}}
+	g.updatePickups()
+	if len(g.pickups) != 1 {
+		t.Fatal("health was taken at full HP")
+	}
+	p.HP = 3
+	g.updatePickups()
+	if len(g.pickups) != 0 || p.HP != 3+pickupHP {
+		t.Fatalf("health pickup: %d left, HP %d", len(g.pickups), p.HP)
+	}
+	p.Spare[0] = 0
+	g.pickups = []*Pickup{{Kind: pickAmmo, Pos: p.Pos}}
+	g.updatePickups()
+	if p.Spare[0] != g.weapons[0].Ammo/2 {
+		t.Fatalf("ammo pickup gave the rifle %d spare rounds", p.Spare[0])
+	}
+	g.pickups = []*Pickup{{Kind: pickAmmo, Pos: p.Pos.Add(geom.V(200, 0))}}
+	for i := 0; i < int(pickupLife*60)+2; i++ {
+		g.updatePickups()
+	}
+	if len(g.pickups) != 0 {
+		t.Fatal("pickup never timed out")
+	}
+}

@@ -38,10 +38,44 @@ type Player struct {
 	Invuln    float64
 	Dead      bool
 	DeadT     float64
+	Mag       []int   // rounds loaded, per weapon slot
+	Spare     []int   // spare rounds, per slot (unused for unlimited weapons)
+	ReloadT   float64 // time left on the current reload; 0 = not reloading
 }
 
-func newPlayer(pos geom.Vec) *Player {
-	return &Player{Pos: pos, HP: playerMaxHP, Facing: "right", HurtT: 99, SinceShot: 99}
+func newPlayer(pos geom.Vec, weapons []*gfx.Weapon) *Player {
+	p := &Player{Pos: pos, HP: playerMaxHP, Facing: "right", HurtT: 99, SinceShot: 99}
+	for _, w := range weapons {
+		p.Mag = append(p.Mag, w.Mag)
+		p.Spare = append(p.Spare, w.Ammo)
+	}
+	return p
+}
+
+// canReload reports whether slot i has a partly empty magazine and rounds to fill it.
+func (g *Game) canReload(i int) bool {
+	w, p := g.weapons[i], g.player
+	return p.Mag[i] < w.Mag && (w.Ammo == 0 || p.Spare[i] > 0)
+}
+
+func (g *Game) startReload() {
+	p := g.player
+	if p.ReloadT > 0 || !g.canReload(p.Slot) {
+		return
+	}
+	p.ReloadT = g.weapons[p.Slot].ReloadMS / 1000
+	g.sound("reload", p.Pos)
+}
+
+func (g *Game) finishReload() {
+	p := g.player
+	w := g.weapons[p.Slot]
+	n := w.Mag - p.Mag[p.Slot]
+	if w.Ammo > 0 {
+		n = min(n, p.Spare[p.Slot])
+		p.Spare[p.Slot] -= n
+	}
+	p.Mag[p.Slot] += n
 }
 
 // facingFor maps an aim angle to one of the 8 facings (45° sectors).
@@ -113,11 +147,24 @@ func (g *Game) updatePlayer(in Input) {
 	}
 
 	// weapons
+	slot := p.Slot
 	if in.SelectSlot >= 0 && in.SelectSlot < g.unlocked {
-		p.Slot = in.SelectSlot
+		slot = in.SelectSlot
 	}
 	if in.Cycle != 0 {
-		p.Slot = (p.Slot + in.Cycle + g.unlocked) % g.unlocked
+		slot = (slot + in.Cycle + g.unlocked) % g.unlocked
+	}
+	if slot != p.Slot {
+		p.Slot, p.ReloadT = slot, 0 // switching drops the reload
+	}
+	if p.ReloadT > 0 {
+		if p.ReloadT -= dt; p.ReloadT <= 0 {
+			p.ReloadT = 0
+			g.finishReload()
+		}
+	}
+	if in.Reload || p.Mag[p.Slot] == 0 { // an empty gun reloads by itself, even after switching back to it
+		g.startReload()
 	}
 
 	// movement
@@ -145,8 +192,14 @@ func (g *Game) updatePlayer(in Input) {
 	if w.SemiAuto {
 		trigger = in.FirePressed
 	}
-	if trigger && p.FireCD <= 0 {
+	switch {
+	case !trigger || p.FireCD > 0 || p.ReloadT > 0:
+	case p.Mag[p.Slot] > 0:
 		g.fire(w)
+		p.Mag[p.Slot]--
+	default: // empty and nothing to reload with
+		g.sound("dry_fire", p.Pos)
+		p.FireCD = 0.3
 	}
 }
 

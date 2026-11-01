@@ -353,7 +353,8 @@ def weapon_rifle():
     put(w, 16, 6, AMB)
     _glove(w, 6, 7)
     return outline(w), {"pivot": [6, 7], "muzzle": [22, 5], "fire_ms": 120, "spread_deg": 3,
-                        "pellets": 1, "recoil_px": 1, "bullet_speed": 420, "damage": 1}
+                        "pellets": 1, "recoil_px": 1, "bullet_speed": 420, "damage": 1,
+                        "mag": 36, "reload_ms": 900, "ammo": 180}
 
 
 def weapon_pistol():
@@ -366,7 +367,7 @@ def weapon_pistol():
     _glove(w, 6, 7)
     return outline(w), {"pivot": [6, 7], "muzzle": [14, 5], "fire_ms": 260, "spread_deg": 1,
                         "pellets": 1, "recoil_px": 1, "bullet_speed": 380, "damage": 2,
-                        "semi_auto": True}
+                        "semi_auto": True, "mag": 12, "reload_ms": 800, "ammo": 0}
 
 
 def weapon_shotgun():
@@ -381,7 +382,8 @@ def weapon_shotgun():
     rect(w, 6, 6, 9, 6, G0)
     _glove(w, 7, 7)
     return outline(w), {"pivot": [7, 7], "muzzle": [22, 5], "fire_ms": 520, "spread_deg": 18,
-                        "pellets": 5, "recoil_px": 3, "bullet_speed": 400, "damage": 1}
+                        "pellets": 5, "recoil_px": 3, "bullet_speed": 400, "damage": 1,
+                        "mag": 8, "reload_ms": 1000, "ammo": 36}
 
 
 def weapon_smg():
@@ -398,7 +400,8 @@ def weapon_smg():
     put(w, 9, 5, CY)
     _glove(w, 6, 7)
     return outline(w), {"pivot": [6, 7], "muzzle": [19, 5], "fire_ms": 70, "spread_deg": 7,
-                        "pellets": 1, "recoil_px": 1, "bullet_speed": 400, "damage": 1}
+                        "pellets": 1, "recoil_px": 1, "bullet_speed": 400, "damage": 1,
+                        "mag": 40, "reload_ms": 1100, "ammo": 200}
 
 
 def weapon_plasma():
@@ -419,7 +422,7 @@ def weapon_plasma():
     _glove(w, 6, 8)
     return outline(w), {"pivot": [6, 8], "muzzle": [22, 5], "fire_ms": 300, "spread_deg": 1,
                         "pellets": 1, "recoil_px": 2, "bullet_speed": 330, "damage": 3,
-                        "pierce": 3, "projectile": "plasma"}
+                        "pierce": 3, "projectile": "plasma", "mag": 10, "reload_ms": 1300, "ammo": 40}
 
 
 def weapon_launcher():
@@ -436,7 +439,8 @@ def weapon_launcher():
     _glove(w, 7, 8)
     return outline(w), {"pivot": [7, 8], "muzzle": [22, 5], "fire_ms": 750, "spread_deg": 2,
                         "pellets": 1, "recoil_px": 3, "bullet_speed": 240, "damage": 5,
-                        "blast": 40, "projectile": "grenade", "semi_auto": True}
+                        "blast": 40, "projectile": "grenade", "semi_auto": True,
+                        "mag": 4, "reload_ms": 1600, "ammo": 12}
 
 
 def weapons():
@@ -444,8 +448,34 @@ def weapons():
             "smg": weapon_smg(), "plasma": weapon_plasma(), "launcher": weapon_launcher()}
 
 
+def pickup(kind, glint):
+    """A small box lying on the floor: a medkit or an ammo crate."""
+    img = new()
+    if kind == "health":
+        rect(img, 7, 13, 16, 19, G3)
+        rect(img, 7, 13, 16, 13, WHITE)
+        rect(img, 7, 19, 16, 19, G2)
+        rect(img, 11, 14, 12, 18, RED)
+        rect(img, 9, 15, 14, 16, RED)
+    else:
+        rect(img, 7, 14, 16, 19, A1)
+        rect(img, 7, 14, 16, 14, A2)
+        rect(img, 7, 19, 16, 19, A0)
+        rect(img, 8, 16, 15, 17, AMB_D)
+        for bx in (8, 10, 12, 14):          # brass rounds poking out of the top
+            rect(img, bx, 11, bx + 1, 13, AMB)
+            put(img, bx, 11, FLASH1)
+    img = outline(img)
+    if glint:
+        put(img, 15, 13 if kind == "health" else 11, WHITE)
+        put(img, 16, 12 if kind == "health" else 10, FLASH1)
+    return with_shadow(img, rx=6)
+
+
 def player_fx():
-    a = {"muzzle_flash": [], "crosshair": []}
+    a = {"muzzle_flash": [], "crosshair": [],
+         "pickup_health": [pickup("health", g) for g in (0, 0, 0, 1)],
+         "pickup_ammo": [pickup("ammo", g) for g in (0, 0, 0, 1)]}
     for s in (3, 2, 1):
         img = new()
         flash_star(img, 12, 12, s)
@@ -943,11 +973,91 @@ def fx_anims():
     return a
 
 
+# ============================================================================
+# FONT - 5x7 pixel glyphs for the HUD, white with a baked 1px dark outline so
+# text reads over any background. The game tints them and draws titles at 2x.
+# ============================================================================
+GLYPHS = {
+    "A": ".###.|#...#|#...#|#####|#...#|#...#|#...#",
+    "B": "####.|#...#|#...#|####.|#...#|#...#|####.",
+    "C": ".###.|#...#|#....|#....|#....|#...#|.###.",
+    "D": "####.|#...#|#...#|#...#|#...#|#...#|####.",
+    "E": "#####|#....|#....|####.|#....|#....|#####",
+    "F": "#####|#....|#....|####.|#....|#....|#....",
+    "G": ".###.|#...#|#....|#.###|#...#|#...#|.####",
+    "H": "#...#|#...#|#...#|#####|#...#|#...#|#...#",
+    "I": ".###.|..#..|..#..|..#..|..#..|..#..|.###.",
+    "J": "..###|...#.|...#.|...#.|...#.|#..#.|.##..",
+    "K": "#...#|#..#.|#.#..|##...|#.#..|#..#.|#...#",
+    "L": "#....|#....|#....|#....|#....|#....|#####",
+    "M": "#...#|##.##|#.#.#|#.#.#|#...#|#...#|#...#",
+    "N": "#...#|#...#|##..#|#.#.#|#..##|#...#|#...#",
+    "O": ".###.|#...#|#...#|#...#|#...#|#...#|.###.",
+    "P": "####.|#...#|#...#|####.|#....|#....|#....",
+    "Q": ".###.|#...#|#...#|#...#|#.#.#|#..#.|.##.#",
+    "R": "####.|#...#|#...#|####.|#.#..|#..#.|#...#",
+    "S": ".####|#....|#....|.###.|....#|....#|####.",
+    "T": "#####|..#..|..#..|..#..|..#..|..#..|..#..",
+    "U": "#...#|#...#|#...#|#...#|#...#|#...#|.###.",
+    "V": "#...#|#...#|#...#|#...#|#...#|.#.#.|..#..",
+    "W": "#...#|#...#|#...#|#.#.#|#.#.#|#.#.#|.#.#.",
+    "X": "#...#|#...#|.#.#.|..#..|.#.#.|#...#|#...#",
+    "Y": "#...#|#...#|.#.#.|..#..|..#..|..#..|..#..",
+    "Z": "#####|....#|...#.|..#..|.#...|#....|#####",
+    "0": ".###.|#...#|#..##|#.#.#|##..#|#...#|.###.",
+    "1": "..#..|.##..|..#..|..#..|..#..|..#..|.###.",
+    "2": ".###.|#...#|....#|...#.|..#..|.#...|#####",
+    "3": "####.|....#|....#|.###.|....#|....#|####.",
+    "4": "...#.|..##.|.#.#.|#..#.|#####|...#.|...#.",
+    "5": "#####|#....|####.|....#|....#|#...#|.###.",
+    "6": ".###.|#....|#....|####.|#...#|#...#|.###.",
+    "7": "#####|....#|...#.|..#..|.#...|.#...|.#...",
+    "8": ".###.|#...#|#...#|.###.|#...#|#...#|.###.",
+    "9": ".###.|#...#|#...#|.####|....#|....#|.###.",
+    " ": ".....|.....|.....|.....|.....|.....|.....",
+    ".": ".....|.....|.....|.....|.....|.....|..#..",
+    ",": ".....|.....|.....|.....|.....|..#..|.#...",
+    ":": ".....|..#..|.....|.....|.....|..#..|.....",
+    "!": "..#..|..#..|..#..|..#..|..#..|.....|..#..",
+    "?": ".###.|#...#|....#|...#.|..#..|.....|..#..",
+    "-": ".....|.....|.....|.###.|.....|.....|.....",
+    "+": ".....|..#..|..#..|#####|..#..|..#..|.....",
+    "=": ".....|.....|#####|.....|#####|.....|.....",
+    "/": "....#|...#.|...#.|..#..|.#...|.#...|#....",
+    "%": "##..#|##.#.|...#.|..#..|.#...|.#.##|#..##",
+    "(": "...#.|..#..|.#...|.#...|.#...|..#..|...#.",
+    ")": ".#...|..#..|...#.|...#.|...#.|..#..|.#...",
+    "[": ".###.|.#...|.#...|.#...|.#...|.#...|.###.",
+    "]": ".###.|...#.|...#.|...#.|...#.|...#.|.###.",
+    "<": "...#.|..#..|.#...|#....|.#...|..#..|...#.",
+    ">": ".#...|..#..|...#.|....#|...#.|..#..|.#...",
+    "'": "..#..|..#..|.....|.....|.....|.....|.....",
+}
+FONT_CELL = (7, 9)  # 5x7 glyph plus the outline on every side
+FONT_ADVANCE = 6
+
+
+def font_sheet():
+    chars = "".join(GLYPHS)
+    cw, ch = FONT_CELL
+    sheet = Image.new("RGBA", (cw * len(chars), ch), CLEAR)
+    for i, c in enumerate(chars):
+        g = Image.new("RGBA", FONT_CELL, CLEAR)
+        for y, row in enumerate(GLYPHS[c].split("|")):
+            assert len(row) == 5, c
+            for x, bit in enumerate(row):
+                if bit == "#":
+                    put(g, x + 1, y + 1, WHITE)
+        sheet.alpha_composite(outline(g), (i * cw, 0))
+    meta = {"chars": chars, "cell": list(FONT_CELL), "advance": FONT_ADVANCE, "glyph_origin": [1, 1]}
+    return sheet, meta
+
+
 # ---- sheet assembly --------------------------------------------------------
 TIMING_MS = {  # per-frame durations used by the game and by the previews
     "idle": 180, "walk": 110, "hurt": 80, "death": 130, "attack": 90,
     "bullet": 50, "laser": 50, "hit_spark": 50, "acid_glob": 90, "acid_splash": 80, "explosion": 70,
-    "muzzle_flash": 40, "crosshair": 300, "plasma": 60, "grenade": 100, "spine": 80,
+    "muzzle_flash": 40, "crosshair": 300, "plasma": 60, "grenade": 100, "spine": 80, "pickup": 250,
 }
 
 
@@ -1019,6 +1129,8 @@ def main():
                                                   ("bomber.", all_["bomber"]),
                                                   ("brute.", all_["brute"])])
     b_sheet, b_meta = write_sheet("boss.png", [("", all_["boss"])], size=B)
+    t_sheet, t_meta = font_sheet()
+    t_sheet.save("font.png")
     f_sheet, f_meta = write_sheet("fx.png", [("", all_["fx"])])
     with open("sprites.json", "w") as f:
         json.dump({
@@ -1040,9 +1152,10 @@ def main():
             },
             "sheets": {"player.png": p_meta, "enemies.png": e_meta, "fx.png": f_meta, "boss.png": b_meta},
             "weapons.png": w_meta,
+            "font.png": t_meta,
         }, f, indent=2)
     # viewing copy
-    sheets = (p_sheet, w_sheet, e_sheet, f_sheet, b_sheet)
+    sheets = (p_sheet, w_sheet, e_sheet, f_sheet, b_sheet, t_sheet)
     w = max(s.width for s in sheets)
     h = sum(s.height for s in sheets) + 3 * F
     view = Image.new("RGBA", (w, h), (34, 38, 50, 255))

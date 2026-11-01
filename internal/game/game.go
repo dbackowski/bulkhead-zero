@@ -45,6 +45,7 @@ type Game struct {
 	bullets    []*Bullet
 	shots      []*Shot
 	fx         []*FX
+	pickups    []*Pickup
 	scorches   []geom.Vec
 	blasts     []pendingBlast
 	flow       []int
@@ -115,7 +116,7 @@ func (g *Game) reset() error {
 	}
 	g.lvl = lvl
 	g.static = renderLevel(g.lib, lvl)
-	g.player = newPlayer(lvl.Start)
+	g.player = newPlayer(lvl.Start, g.weapons)
 	g.enemies = g.enemies[:0]
 	for _, s := range lvl.Spawns {
 		g.enemies = append(g.enemies, newEnemy(s, g.rng))
@@ -123,7 +124,7 @@ func (g *Game) reset() error {
 	g.totalFoes, g.kills = len(g.enemies), 0
 	g.wave, g.queue, g.nextIn, g.boss, g.banner, g.bannerT = 1, nil, 0, nil, "", 0
 	g.unlocked = min(3, len(g.weapons))
-	g.bullets, g.shots, g.fx, g.scorches, g.blasts = nil, nil, nil, nil, nil
+	g.bullets, g.shots, g.fx, g.scorches, g.blasts, g.pickups = nil, nil, nil, nil, nil, nil
 	g.state, g.stateT, g.t = statePlaying, 0, 0
 	g.flow = lvl.DistanceField(g.player.Pos)
 	g.cam = g.cameraTarget(geom.V(ScreenW/2, ScreenH/2))
@@ -168,6 +169,7 @@ func (g *Game) Update() error {
 	g.stateT += dt
 
 	g.updatePlayer(in)
+	g.updatePickups()
 	g.flowTimer -= dt
 	if g.flowTimer <= 0 {
 		g.flow = g.lvl.DistanceField(g.player.Pos)

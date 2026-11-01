@@ -15,6 +15,7 @@ type Input struct {
 	FirePressed bool     // trigger pressed this tick (semi-auto weapons)
 	SelectSlot  int      // 0..n-1, or -1
 	Cycle       int      // -1, 0, +1
+	Reload      bool
 	Restart     bool
 	Pause       bool
 	Fullscreen  bool
@@ -53,8 +54,11 @@ func readInput(g *Game) Input {
 	} else if wy < 0 {
 		in.Cycle = 1
 	}
-	in.Restart = inpututil.IsKeyJustPressed(ebiten.KeyR) ||
-		((g.state == stateDead || g.state == stateClear) && g.stateT > 1 && in.FirePressed)
+	// R reloads while playing; it restarts from the pause menu or after the round
+	r := inpututil.IsKeyJustPressed(ebiten.KeyR)
+	over := g.state == stateDead || g.state == stateClear
+	in.Reload = r && g.state == statePlaying
+	in.Restart = r && (g.state == statePaused || over) || over && g.stateT > 1 && in.FirePressed
 	in.Pause = inpututil.IsKeyJustPressed(ebiten.KeyEscape) || inpututil.IsKeyJustPressed(ebiten.KeyP)
 	in.Fullscreen = inpututil.IsKeyJustPressed(ebiten.KeyF)
 	in.Mute = inpututil.IsKeyJustPressed(ebiten.KeyM)

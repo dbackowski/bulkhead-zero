@@ -378,6 +378,18 @@
         "frames": 2,
         "frame_ms": 300,
         "loop": true
+      },
+      "pickup_health": {
+        "row": 11,
+        "frames": 4,
+        "frame_ms": 250,
+        "loop": true
+      },
+      "pickup_ammo": {
+        "row": 12,
+        "frames": 4,
+        "frame_ms": 250,
+        "loop": true
       }
     },
     "boss.png": {
@@ -425,7 +437,10 @@
       "pellets": 1,
       "recoil_px": 1,
       "bullet_speed": 420,
-      "damage": 1
+      "damage": 1,
+      "mag": 36,
+      "reload_ms": 900,
+      "ammo": 180
     },
     "pistol": {
       "rect": [
@@ -448,7 +463,10 @@
       "recoil_px": 1,
       "bullet_speed": 380,
       "damage": 2,
-      "semi_auto": true
+      "semi_auto": true,
+      "mag": 12,
+      "reload_ms": 800,
+      "ammo": 0
     },
     "shotgun": {
       "rect": [
@@ -470,7 +488,10 @@
       "pellets": 5,
       "recoil_px": 3,
       "bullet_speed": 400,
-      "damage": 1
+      "damage": 1,
+      "mag": 8,
+      "reload_ms": 1000,
+      "ammo": 36
     },
     "smg": {
       "rect": [
@@ -492,7 +513,10 @@
       "pellets": 1,
       "recoil_px": 1,
       "bullet_speed": 400,
-      "damage": 1
+      "damage": 1,
+      "mag": 40,
+      "reload_ms": 1100,
+      "ammo": 200
     },
     "plasma": {
       "rect": [
@@ -516,7 +540,10 @@
       "bullet_speed": 330,
       "damage": 3,
       "pierce": 3,
-      "projectile": "plasma"
+      "projectile": "plasma",
+      "mag": 10,
+      "reload_ms": 1300,
+      "ammo": 40
     },
     "launcher": {
       "rect": [
@@ -541,7 +568,22 @@
       "damage": 5,
       "blast": 40,
       "projectile": "grenade",
-      "semi_auto": true
+      "semi_auto": true,
+      "mag": 4,
+      "reload_ms": 1600,
+      "ammo": 12
     }
+  },
+  "font.png": {
+    "chars": "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,:!?-+=/%()[]<>'",
+    "cell": [
+      7,
+      9
+    ],
+    "advance": 6,
+    "glyph_origin": [
+      1,
+      1
+    ]
   }
 }

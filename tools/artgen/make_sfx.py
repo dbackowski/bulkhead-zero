@@ -399,6 +399,33 @@ def spine(rng, v):
     return finish(drive(mix(whip, thock), 1.6))
 
 
+def pickup_sfx(rng, v):
+    """Picking something up: two quick rising blips."""
+    n = int(0.2 * RATE)
+    f = (880, 990, 830)[v]
+    a = scale(tone(n, f, 0.03), 0.8)
+    b = delayed(tone(n, f * 1.5, 0.05), 0.06)
+    return finish(reverb(drive(mix(a, b), 1.4), 0.12, size=0.5))
+
+
+def reload_sfx(rng, v):
+    """A magazine out, a magazine in, then the bolt: three metal clacks."""
+    n = int(0.55 * RATE)
+    s = [0.0] * n
+    for at, f, amp in ((0.0, 1500, 0.7), (0.22 + 0.02 * v, 1100, 1.0), (0.4, 2300, 0.9)):
+        c = env(biquad(noise(rng, n), "bp", f * (1 + 0.04 * v), q=4), 0.008, delay=at)
+        s = [x + amp * y for x, y in zip(s, c)]
+    return finish(reverb(s, 0.1, size=0.5))
+
+
+def dry_fire(rng, v):
+    """Trigger pulled on an empty gun: one small hollow click."""
+    n = int(0.08 * RATE)
+    click = env(biquad(noise(rng, n), "bp", 3200 + 200 * v, q=5), 0.004)
+    knock = scale(tone(n, 900, 0.006), 0.3)
+    return finish(mix(click, knock))
+
+
 # name: (generator(rng, variant) -> samples, loudness). Loudness is the RMS of
 # the loudest 50 ms above 200 Hz, i.e. roughly how loud it sounds on laptop
 # speakers, so these numbers compare directly; peaks are capped at 0.9.
@@ -430,6 +457,9 @@ SOUNDS = {
     "boss_roar": (boss_roar, 0.28),
     "boss_death": (boss_death, 0.30),
     "spine": (spine, 0.10),
+    "pickup": (pickup_sfx, 0.12),
+    "reload": (reload_sfx, 0.10),
+    "dry_fire": (dry_fire, 0.08),
 }
 
 

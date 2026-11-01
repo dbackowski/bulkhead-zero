@@ -1,7 +1,9 @@
 package gfx
 
 import (
+	"image/color"
 	"math"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/colorm"
@@ -65,4 +67,42 @@ func draw(dst, img *ebiten.Image, g ebiten.GeoM, o SpriteOpts) {
 		op.ColorScale.ScaleAlpha(float32(alpha))
 	}
 	dst.DrawImage(img, op)
+}
+
+// Font is the generated pixel font (font.png): fixed-width, uppercase only.
+type Font struct {
+	glyphs  map[rune]*ebiten.Image
+	advance int // px per character at scale 1
+	height  int // glyph height without the outline
+	origin  [2]int
+}
+
+// Width is how many pixels s takes at the given scale.
+func (f *Font) Width(s string, scale int) int {
+	n := len([]rune(s))
+	if n == 0 {
+		return 0
+	}
+	return (n*f.advance - 1) * scale
+}
+
+// Height is the glyph height (no outline) at the given scale.
+func (f *Font) Height(scale int) int { return f.height * scale }
+
+// Draw writes s with its top-left glyph pixel at (x, y), scaled by a whole
+// number and tinted clr. Lower case is drawn as upper case; unknown characters
+// leave a gap.
+func (f *Font) Draw(dst *ebiten.Image, s string, x, y, scale int, clr color.Color) {
+	for _, c := range strings.ToUpper(s) {
+		g, ok := f.glyphs[c]
+		if ok {
+			op := &ebiten.DrawImageOptions{}
+			op.GeoM.Translate(float64(-f.origin[0]), float64(-f.origin[1]))
+			op.GeoM.Scale(float64(scale), float64(scale))
+			op.GeoM.Translate(float64(x), float64(y))
+			op.ColorScale.ScaleWithColor(clr)
+			dst.DrawImage(g, op)
+		}
+		x += f.advance * scale
+	}
 }

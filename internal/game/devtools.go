@@ -26,7 +26,7 @@ type autopilot struct {
 	mouse     geom.Vec
 	t         float64
 	field     []int
-	fieldFor  *Enemy
+	fieldAt   geom.Vec // target the field was built for
 	fieldTime float64
 
 	// handicap, to play roughly like a person: aim wanders up to aimErr px
@@ -97,6 +97,12 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	case math.Mod(a.t, 24) > 20:
 		slot = 2
 	}
+	if p.ReloadT > 0 {
+		slot = p.Slot // switching would throw the reload away
+	}
+	if p.Mag[slot] == 0 && !g.canReload(slot) {
+		slot = 2 // the pistol never runs dry
+	}
 	if slot != p.Slot {
 		in.SelectSlot = slot
 	}
@@ -106,10 +112,33 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		in.FirePressed = onTarget && int(a.t*60)%14 == 0
 	}
 
-	// movement: back off from close melee enemies, strafe while shooting, otherwise hunt
+	in.Reload = vis == nil && p.Mag[p.Slot] < g.weapons[p.Slot].Mag/2
+
+	// the nearest pickup it has a use for
+	var pick *Pickup
+	for _, pk := range g.pickups {
+		useful := pk.Kind == pickAmmo || p.HP < playerMaxHP
+		if useful && pk.T < pickupLife-3 && (pick == nil || pk.Pos.Dist(p.Pos) < pick.Pos.Dist(p.Pos)) {
+			pick = pk
+		}
+	}
+	goTo := func(target geom.Vec) {
+		a.fieldTime -= dt
+		if a.fieldTime <= 0 || a.fieldAt.Dist(target) > 12 {
+			a.field, a.fieldAt, a.fieldTime = g.lvl.DistanceField(target), target, 0.5
+		}
+		if next, ok := g.lvl.NextStep(a.field, p.Pos); ok {
+			in.Move = next.Sub(p.Pos)
+		} else {
+			in.Move = target.Sub(p.Pos)
+		}
+	}
+
+	// movement: back off from close melee enemies, strafe while shooting,
+	// otherwise grab pickups, otherwise hunt
 	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, boss: 60}
 	switch {
-	case vis != nil && dv < backOff[vis.Kind]:
+	case vis != nil && (dv < backOff[vis.Kind]):
 		in.Move = p.Pos.Sub(vis.Pos).Norm().Add(geom.V(math.Sin(a.t*2), 0).Scale(0.6))
 	case vis != nil:
 		to := vis.Pos.Sub(p.Pos).Norm()
@@ -117,16 +146,10 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		if dv > 150 {
 			in.Move = in.Move.Add(to)
 		}
+	case pick != nil:
+		goTo(pick.Pos)
 	case near != nil:
-		a.fieldTime -= dt
-		if a.fieldFor != near || a.fieldTime <= 0 {
-			a.field, a.fieldFor, a.fieldTime = g.lvl.DistanceField(near.Pos), near, 0.5
-		}
-		if next, ok := g.lvl.NextStep(a.field, p.Pos); ok {
-			in.Move = next.Sub(p.Pos)
-		} else {
-			in.Move = near.Pos.Sub(p.Pos)
-		}
+		goTo(near.Pos)
 	}
 	return in
 }

@@ -393,7 +393,7 @@ def showcase():
         fr = bg.copy()
         for i, (label, frames, ms_) in enumerate(cells):
             n = len(frames)
-            looping = n > 1 and any(k in label for k in ("idle", "walk", "bullet", "laser", "glob", "crosshair", "plasma", "grenade", "spine"))
+            looping = n > 1 and any(k in label for k in ("idle", "walk", "bullet", "laser", "glob", "crosshair", "plasma", "grenade", "spine", "pickup"))
             cycle = n * ms_ + (0 if looping else 500)
             im = frames[min(n - 1, int((t % cycle) // ms_))]
             x, y = (i % cols) * cw + 8, (i // cols) * ch + 4
