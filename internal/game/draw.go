@@ -54,9 +54,17 @@ func renderLevel(lib *gfx.Library, l *world.Level) *ebiten.Image {
 
 func isCap(name string) bool { return len(name) > 8 && name[:8] == "wall_cap" }
 
+// Layers draw bottom to top; inside a layer things are y-sorted by feet.
+const (
+	layerCorpses = iota
+	layerPickups // on top of corpses (they drop where an enemy died)
+	layerLiving  // the player, enemies and props
+)
+
 type drawable struct {
-	y    float64
-	draw func(dst *ebiten.Image, cam geom.Vec)
+	layer int
+	y     float64
+	draw  func(dst *ebiten.Image, cam geom.Vec)
 }
 
 func (g *Game) drawWorld(dst *ebiten.Image) {
@@ -81,33 +89,37 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 		}
 	}
 
-	g.drawPickups(dst, cam)
-
-	// corpses lie under everything that is still alive
 	var list []drawable
+	for _, pk := range g.pickups {
+		pk := pk
+		list = append(list, drawable{layerPickups, pk.Pos.Y, func(d *ebiten.Image, c geom.Vec) { g.drawPickup(d, pk, c) }})
+	}
 	for _, e := range g.enemies {
 		e := e
-		y := e.Pos.Y
+		layer := layerLiving
 		if e.State == stDead {
-			y -= 1000
+			layer = layerCorpses
 		}
-		list = append(list, drawable{y, func(d *ebiten.Image, c geom.Vec) { g.drawEnemy(d, e, c) }})
+		list = append(list, drawable{layer, e.Pos.Y, func(d *ebiten.Image, c geom.Vec) { g.drawEnemy(d, e, c) }})
 	}
 	for _, p := range g.lvl.Props {
 		if !p.Alive {
 			continue
 		}
 		p := p
-		list = append(list, drawable{p.Feet().Y, func(d *ebiten.Image, c geom.Vec) {
+		list = append(list, drawable{layerLiving, p.Feet().Y, func(d *ebiten.Image, c geom.Vec) {
 			gfx.DrawAtFeet(d, g.lib.T(p.Name), p.Feet().X-c.X, p.Feet().Y-c.Y, gfx.SpriteOpts{})
 		}})
 	}
-	py := g.player.Pos.Y
+	layer := layerLiving
 	if g.player.Dead {
-		py -= 999
+		layer = layerCorpses
 	}
-	list = append(list, drawable{py, g.drawPlayer})
-	sort.SliceStable(list, func(i, j int) bool { return list[i].y < list[j].y })
+	list = append(list, drawable{layer, g.player.Pos.Y, g.drawPlayer})
+	sort.SliceStable(list, func(i, j int) bool {
+		a, b := list[i], list[j]
+		return a.layer < b.layer || a.layer == b.layer && a.y < b.y
+	})
 	for _, d := range list {
 		d.draw(dst, cam)
 	}

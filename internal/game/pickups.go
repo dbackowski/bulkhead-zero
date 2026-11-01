@@ -86,16 +86,14 @@ func (g *Game) collect(pk *Pickup) bool {
 	return got
 }
 
-func (g *Game) drawPickups(dst *ebiten.Image, cam geom.Vec) {
-	for _, pk := range g.pickups {
-		if pk.T > pickupLife-4 && int(pk.T*10)%2 == 0 {
-			continue // blinking: about to vanish
-		}
-		name := "fx.pickup_ammo"
-		if pk.Kind == pickHealth {
-			name = "fx.pickup_health"
-		}
-		bob := math.Round(math.Sin(pk.T*4) * 1)
-		gfx.DrawAtFeet(dst, g.lib.A(name).Frame(pk.T), pk.Pos.X-cam.X, pk.Pos.Y-cam.Y+bob, gfx.SpriteOpts{})
+func (g *Game) drawPickup(dst *ebiten.Image, pk *Pickup, cam geom.Vec) {
+	if pk.T > pickupLife-4 && int(pk.T*10)%2 == 0 {
+		return // blinking: about to vanish
 	}
+	name := "fx.pickup_ammo"
+	if pk.Kind == pickHealth {
+		name = "fx.pickup_health"
+	}
+	bob := math.Round(math.Sin(pk.T*4) * 1)
+	gfx.DrawAtFeet(dst, g.lib.A(name).Frame(pk.T), pk.Pos.X-cam.X, pk.Pos.Y-cam.Y+bob, gfx.SpriteOpts{})
 }
