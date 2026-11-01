@@ -90,24 +90,25 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	in.Mouse = a.mouse
 
 	// weapon choice: shotgun up close, rifle otherwise, pistol now and then
-	slot := 0
+	rifle, smg, plasma, pistol := g.slotOf("rifle"), g.slotOf("smg"), g.slotOf("plasma"), g.slotOf("pistol")
+	slot := rifle
 	switch {
 	case vis != nil && dv < 70 && vis.Kind == crawler:
-		slot = 1
+		slot = g.slotOf("shotgun")
 	case math.Mod(a.t, 24) > 20:
-		slot = 2
+		slot = pistol
 	}
-	if slot == 0 && g.unlocked > 3 {
-		slot = 3 // the smg out-damages the rifle
+	if slot == rifle && smg < g.unlocked {
+		slot = smg // the smg out-damages the rifle
 	}
-	if slot == 3 && g.unlocked > 4 && vis != nil && vis.Kind == warden {
-		slot = 4 // plasma: accurate at the range the Warden keeps
+	if slot == smg && plasma < g.unlocked && vis != nil && vis.Kind == warden {
+		slot = plasma // accurate at the range the Warden keeps
 	}
 	if p.ReloadT > 0 {
 		slot = p.Slot // switching would throw the reload away
 	}
 	if p.Mag[slot] == 0 && !g.canReload(slot) {
-		slot = 2 // the pistol never runs dry
+		slot = pistol // it never runs dry
 	}
 	if slot != p.Slot {
 		in.SelectSlot = slot

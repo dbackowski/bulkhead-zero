@@ -121,6 +121,7 @@ func (g *Game) reset() error {
 	g.lvl = lvl
 	g.static = renderLevel(g.lib, lvl)
 	g.player = newPlayer(lvl.Start, g.weapons)
+	g.player.Slot = max(g.slotOf(startWeapon), 0)
 	g.enemies = g.enemies[:0]
 	for _, s := range lvl.Spawns {
 		g.enemies = append(g.enemies, newEnemy(s, g.rng))

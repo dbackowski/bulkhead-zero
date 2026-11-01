@@ -2,6 +2,7 @@ package game
 
 import (
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/dbackowski/bulkhead-zero/internal/geom"
@@ -19,8 +20,16 @@ const (
 )
 
 // Slot order for keys 1-6. The first three are there from the start; each
-// cleared wave unlocks the next.
-var weaponOrder = []string{"rifle", "shotgun", "pistol", "smg", "plasma", "launcher"}
+// cleared wave unlocks the next. Code that needs a particular gun looks it up
+// with slotOf rather than by number.
+var weaponOrder = []string{"pistol", "rifle", "shotgun", "smg", "plasma", "launcher"}
+
+const startWeapon = "rifle" // the gun in hand when a deck starts
+
+// slotOf is the slot holding the named weapon, or -1.
+func (g *Game) slotOf(name string) int {
+	return slices.IndexFunc(g.weapons, func(w *gfx.Weapon) bool { return w.Name == name })
+}
 
 // Player is the marine. Pos is the feet position.
 type Player struct {

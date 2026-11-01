@@ -164,7 +164,9 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
 ## Prototype: what exists
 
 - **Controls:** WASD/arrows move, mouse aims, LMB fires (pistol and launcher semi-auto, the
-  rest automatic), R reloads, 1-6, Q or wheel switch between unlocked weapons, Esc/P pause,
+  rest automatic), R reloads, 1-6 (pistol, rifle, shotgun, smg, plasma, launcher; `weaponOrder`,
+  look guns up with `slotOf`, never by number), Q or wheel switch between unlocked weapons;
+  each deck starts with the rifle in hand. Esc/P pause,
   F fullscreen, M mute. Restart is R in the pause menu, or R / click after dying or winning.
 - **Ammo** (`player.go`): each weapon slot has its own loaded and spare rounds, starting full.
   An empty gun reloads by itself (also when you switch back to it); switching weapons
