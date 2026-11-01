@@ -24,6 +24,8 @@ type sfx struct {
 	last  map[string]float64  // game time each sound last started
 	live  []*audio.Player     // held so playing sounds aren't garbage collected
 	music map[string]*track
+	duckT float64 // music stays ducked while > 0 (a stinger is playing)
+	duck  float64 // current music level from ducking, 0..1
 	muted bool
 }
 
@@ -40,6 +42,8 @@ const (
 	musicVolume  = 0.45 // under the sound effects
 	musicFade    = 1.5  // seconds for a crossfade
 	combatLinger = 5.0  // seconds combat music outlasts the last hunter: longer than a wave break, so it carries through
+	duckLevel    = 0.3  // music level under a stinger
+	duckTime     = 2.0  // seconds the music stays ducked
 )
 
 // loadClips decodes sounds/<name>_<variant>.wav into PCM, grouped by name.
@@ -80,7 +84,7 @@ func newSFX(fsys fs.FS) (*sfx, error) {
 	if ctx == nil {
 		ctx = audio.NewContext(sampleRate)
 	}
-	s := &sfx{ctx: ctx, clips: clips, last: map[string]float64{}, music: map[string]*track{}}
+	s := &sfx{ctx: ctx, clips: clips, last: map[string]float64{}, music: map[string]*track{}, duck: 1}
 	for _, name := range musicTracks {
 		b, err := fs.ReadFile(fsys, "music/music_"+name+".wav")
 		if err != nil {
@@ -97,6 +101,15 @@ func newSFX(fsys fs.FS) (*sfx, error) {
 		s.music[name] = &track{p: p}
 	}
 	return s, nil
+}
+
+// stinger plays a short musical cue (stinger_<name> in assets/sounds, from
+// make_music.py) at full volume and ducks the music under it.
+func (g *Game) stinger(name string) {
+	g.sound("stinger_"+name, g.player.Pos)
+	if g.sfx != nil {
+		g.sfx.duckT = duckTime
+	}
 }
 
 // musicTrack picks the loop for the moment: the boss theme while a boss is
@@ -135,7 +148,13 @@ func (g *Game) updateMusic() {
 	if s == nil {
 		return
 	}
-	want, gain := g.musicTrack(), musicVolume
+	s.duckT -= dt
+	if s.duckT > 0 {
+		s.duck = math.Max(s.duck-dt*3, duckLevel)
+	} else {
+		s.duck = math.Min(s.duck+dt, 1)
+	}
+	want, gain := g.musicTrack(), musicVolume*s.duck
 	if s.muted {
 		gain = 0
 	} else if g.state == statePaused {

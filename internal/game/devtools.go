@@ -6,6 +6,7 @@ package game
 //	                 BZ_AUTOPILOT=human gives it shaky aim and slow reactions
 //	BZ_RECORD=dir    save every 3rd frame as PNG into dir, then quit after
 //	                 BZ_RECORD_SECONDS (default 40) seconds of game time
+//	BZ_DECK=2        start on that deck (1-based) instead of the first
 //
 // Example: BZ_AUTOPILOT=1 BZ_RECORD=/tmp/frames go run .
 

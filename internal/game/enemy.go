@@ -518,6 +518,7 @@ func (g *Game) kill(e *Enemy) {
 		g.blast(e.Pos, bomberBlast, 3)
 	case brood, warden:
 		g.say(bossName[e.Kind]+" DOWN", 2.5)
+		g.stinger("victory")
 		for i := 0; i < 6; i++ {
 			off := geom.FromAngle(float64(i) * 1.1).Scale(float64(6 + i*3))
 			g.fx = append(g.fx, &FX{Anim: g.lib.A("fx.explosion"), Pos: e.Pos.Sub(geom.V(0, 18)).Add(off), T: -0.12 * float64(i)})

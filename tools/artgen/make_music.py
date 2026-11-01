@@ -10,6 +10,15 @@ reverb, ringing notes) is folded back onto the start.
     combat  during a wave: driving bass, drums, a 16th-note arpeggio
     boss    the boss fight: faster, darker progression, heavier drums, stabs
 
+It also writes short one-shot stingers, stinger_<name>_0.wav, which the game
+plays like sound effects (build.py puts them in assets/sounds/):
+
+    wave     a wave is coming in: a drum roll swelling into two brass stabs
+    clear    a wave is cleared: a quick rising arpeggio that resolves
+    boss     a boss appears: a low swell into a heavy dissonant hit
+    death    the marine dies: a slow falling minor phrase over a drone
+    victory  a boss is down: a bright fanfare ending on a major chord
+
 Standard library only (reuses make_sfx's synth helpers); seeded, so the
 output is identical on every run.
 """
@@ -18,7 +27,8 @@ import random
 import struct
 import wave
 
-from make_sfx import RATE, biquad, env, noise, reverb, scale, sweep, tone
+import make_sfx
+from make_sfx import RATE, biquad, env, finish, noise, reverb, scale, sweep, tone
 
 OUT_RATE = RATE // 2
 
@@ -235,6 +245,71 @@ def boss(rng):
 TRACKS = {"calm": calm, "combat": combat, "boss": boss}
 
 
+# ---- stingers -----------------------------------------------------------------
+def stab(rng, notes, secs, cutoff=3500, amp=1.0):
+    """A brass-like chord hit: detuned saws through a closing filter."""
+    n = int(secs * RATE)
+    mixed = [0.0] * n
+    for m in notes:
+        for det in (-0.006, 0.0, 0.006):
+            for i, x in enumerate(saw(n, hz(m), det, rng)):
+                mixed[i] += x
+    mixed = biquad(mixed, "lp", sweep(cutoff, cutoff * 0.25, 0.25), q=1.2)
+    return scale(adsr(mixed, 0.01, 0.2, 0.5, 0.3), amp / (3 * len(notes)))
+
+
+def tom(amp=1.0, f=110):
+    n = int(0.4 * RATE)
+    return scale(tone(n, sweep(f * 1.4, f, 0.03), 0.18), amp)
+
+
+def one_shot(secs, parts, wet=0.35):
+    """Mix (start_seconds, samples, gain) parts into one sound with a reverb tail."""
+    out = [0.0] * int(secs * RATE)
+    for at, sound, gain in parts:
+        add(out, int(at * RATE), sound, gain)
+    return finish(reverb(out, wet, size=1.5, decay=0.84), fade=0.3)
+
+
+def stinger_wave(rng):
+    roll = [(0.07 * i ** 0.85, tom(0.2 + 0.05 * i, 100), 1.0) for i in range(14)]
+    return one_shot(2.2, roll + [(1.0, stab(rng, Am + (45,), 0.45), 1.6), (1.25, stab(rng, E + (40,), 0.8), 1.8),
+                                 (1.0, kick(rng), 0.9), (1.25, kick(rng), 1.0), (1.25, snare(rng), 0.6)])
+
+
+def stinger_clear(rng):
+    notes = (69, 72, 76, 81)
+    run = [(0.09 * i, pluck(m, secs=0.3, cutoff=3500, duty=0.3), 0.7) for i, m in enumerate(notes)]
+    return one_shot(1.8, run + [(0.4, bell(84), 0.6), (0.4, pad(rng, C + (60,), 1.0, cutoff=2200), 1.0)])
+
+
+def stinger_boss(rng):
+    n = int(1.6 * RATE)
+    low = [a + 0.6 * b for a, b in zip(saw(n, hz(38), 0, rng), saw(n, hz(50), 0.004, rng))]  # D2 + D3: audible on laptops
+    swell = [x * min(1.0, i / n) ** 2 for i, x in enumerate(low)]
+    swell = biquad(swell, "lp", sweep(200, 1200, 1.2))
+    hit = stab(rng, (38, 39, 45, 50), 1.2, cutoff=2500)  # D with a clashing E-flat
+    return one_shot(3.0, [(0.0, swell, 0.5), (1.5, hit, 2.0), (1.5, kick(rng), 1.2), (1.5, tom(1.0, 60), 1.0)], wet=0.45)
+
+
+def stinger_death(rng):
+    phrase = [(0.0, 69), (0.5, 67), (1.0, 65), (1.5, 64)]
+    drone = pad(rng, (45, 52), 3.0, cutoff=700)
+    return one_shot(3.6, [(0.0, drone, 1.2)] + [(t, bell(m - 12), 0.6) for t, m in phrase], wet=0.5)
+
+
+def stinger_victory(rng):
+    fanfare = [(0.0, 60), (0.12, 64), (0.24, 67), (0.36, 72)]
+    parts = [(t, pluck(m + 12, secs=0.25, cutoff=4000, duty=0.5), 0.6) for t, m in fanfare]
+    parts += [(0.5, stab(rng, C + (36, 72), 1.4, cutoff=4500), 1.8), (0.5, bell(84), 0.5),
+              (0.5, kick(rng), 0.9), (0.5, snare(rng), 0.5)]
+    return one_shot(2.8, parts)
+
+
+STINGERS = {"wave": stinger_wave, "clear": stinger_clear, "boss": stinger_boss,
+            "death": stinger_death, "victory": stinger_victory}
+
+
 def write(name, samples):
     smooth = biquad(biquad(samples, "lp", 9000), "lp", 9000)  # no aliasing when halving the rate
     half = smooth[::2]
@@ -249,7 +324,9 @@ def write(name, samples):
 def main():
     for i, (name, make) in enumerate(TRACKS.items()):
         write(f"music_{name}.wav", make(random.Random(1000 + i)))
-    print(f"music: {len(TRACKS)} loops")
+    for i, (name, make) in enumerate(STINGERS.items()):
+        make_sfx.write(f"stinger_{name}_0.wav", make(random.Random(2000 + i)), 0.17)
+    print(f"music: {len(TRACKS)} loops, {len(STINGERS)} stingers")
 
 
 if __name__ == "__main__":

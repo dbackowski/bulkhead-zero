@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/dbackowski/bulkhead-zero/assets"
@@ -95,6 +96,9 @@ func New() (*Game, error) {
 		g.autopilot = newHumanAutopilot()
 	default:
 		g.autopilot = newAutopilot()
+	}
+	if n, err := strconv.Atoi(os.Getenv("BZ_DECK")); err == nil && n >= 1 && n <= len(levels) {
+		g.level = n - 1
 	}
 	if dir := os.Getenv("BZ_RECORD"); dir != "" {
 		g.recorder = newRecorder(dir)
@@ -204,6 +208,7 @@ func (g *Game) Update() error {
 
 	if g.state == statePlaying && g.player.Dead && g.player.DeadT > 1.2 {
 		g.state, g.stateT = stateDead, 0
+		g.stinger("death")
 	}
 	if g.recorder != nil {
 		g.recorder.tick(g)

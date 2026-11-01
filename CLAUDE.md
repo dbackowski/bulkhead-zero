@@ -39,6 +39,7 @@ assets/sprites/   player.png, enemies.png, fx.png (one animation per row, 24×24
 assets/sounds/    <name>_<variant>.wav, 16-bit mono 44.1 kHz (the game picks a random variant)
 assets/music/     music_<name>.wav loops, 16-bit mono 22.05 kHz
 tools/artgen/     make_tiles.py, make_sprites.py, make_sfx.py, make_music.py, make_preview.py, build.py
+tools/maps/       reactor.py: lays out the Reactor map by coordinates and writes it into maps.go
 docs/previews/    enlarged sheets + scene.gif / animations.gif / aiming.png for viewing only
 ```
 
@@ -214,6 +215,10 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   boss lives). Switching crossfades over 1.5 s and a loop that fades in starts from its
   beginning. Music sits at 0.45 volume under the effects, drops to 40% while paused, and
   M mutes it with everything else.
+- **Stingers** (`g.stinger(name)`): short musical cues from `STINGERS` in make_music.py,
+  saved as `assets/sounds/stinger_<name>_0.wav` and played like sounds at full volume while
+  the music ducks to 30% for 2 s: `wave` (a wave starts), `clear` (a wave is cleared),
+  `boss` (a boss appears), `victory` (a boss dies), `death` (the death screen comes up).
 - **Projectiles** keep a *ground* position plus a height `H` they're drawn at. Collisions use
   the ground position (walls, props, enemy radius), which keeps the 3/4 view simple.
   Bullets move in 4 sub-steps per tick.
@@ -234,8 +239,10 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   (`blast` in combat.go, shared with bombers and grenades).
 - **Dev tools** (`internal/game/devtools.go`): `BZ_AUTOPILOT=1` lets a bot play
   (`BZ_AUTOPILOT=human` gives it shaky aim and 0.35 s reactions, a rough stand-in for a person);
-  `BZ_RECORD=dir BZ_RECORD_SECONDS=30` saves every 3rd frame as PNG and then quits.
-  `docs/previews/gameplay.gif` was made that way.
+  `BZ_RECORD=dir BZ_RECORD_SECONDS=30` saves every 3rd frame as PNG and then quits;
+  `BZ_DECK=2` starts on that deck (also handy to practise a boss).
+  `docs/previews/gameplay.gif` was made that way: clips of the deck 1 opening, a wave
+  coming in, the Brood Mother and the Warden, picked from two recorded bot runs.
 - **Tests:** world parsing/connectivity (every spawn reachable), autotile vs the Python
   golden data, collision, line of sight, flow-field following, metadata completeness,
   facing sectors, doors, the wave → boss → clear flow, reloading, pickups, music choice, and full rounds
@@ -264,10 +271,10 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   and `ammo` could tighten if it never feels scarce.
 - More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call. Music per
   deck (e.g. the Reactor transposed or with its own lead) would be new `TRACKS` entries
-  plus a deck field choosing them; stingers for wave start, death and victory.
+  plus a deck field choosing them.
 - More decks: a map in `maps.go` (keep `TestMapsAreConnected` passing) plus an entry in
   `levels`; a new boss is a kind, a stats entry, an attack function and a bosses.png row.
-  The Reactor map was laid out by a small script (rooms, openings and props as
-  coordinates) rather than typed by hand, which avoids off-by-one columns.
-- `docs/previews/gameplay.gif` predates waves and doors; re-record it.
+  The Reactor map is laid out by `tools/maps/reactor.py` (rooms, openings and props as
+  coordinates; `--print` shows it with column numbers) rather than typed by hand, which
+  avoids off-by-one columns; edit the script, not the strings in maps.go.
 - Possible later mode: turn-based tactics reusing the same tiles and sprites.

@@ -92,6 +92,7 @@ func (g *Game) waveCleared() {
 		msg += fmt.Sprintf("\nNEW WEAPON: %s [%d]", strings.ToUpper(g.weapons[g.unlocked-1].Name), g.unlocked)
 	}
 	g.say(msg, waveBreak)
+	g.stinger("clear")
 }
 
 func (g *Game) startWave() {
@@ -100,6 +101,7 @@ func (g *Game) startWave() {
 		g.queue = []byte(g.deck().waves[g.wave-2])
 		g.totalFoes = len(g.queue)
 		g.say(fmt.Sprintf("WAVE %d", g.wave), 2)
+		g.stinger("wave")
 		return
 	}
 	g.boss = g.spawnHunter(g.deck().boss, g.lvl.Boss)
@@ -108,6 +110,7 @@ func (g *Game) startWave() {
 	g.shake(5, 0.6)
 	g.sound(map[enemyKind]string{brood: "boss_roar", warden: "warden_alarm"}[g.boss.Kind], g.boss.Pos)
 	g.say("WARNING\n"+bossName[g.boss.Kind], 3)
+	g.stinger("boss")
 }
 
 // spawnHunter adds an enemy that is already hunting the player.
