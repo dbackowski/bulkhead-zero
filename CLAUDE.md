@@ -247,8 +247,9 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   (`BZ_AUTOPILOT=human` gives it shaky aim and 0.35 s reactions, a rough stand-in for a person);
   `BZ_RECORD=dir BZ_RECORD_SECONDS=30` saves every 3rd frame as PNG and then quits;
   `BZ_DECK=2` starts on that deck (also handy to practise a boss).
-  `docs/previews/gameplay.gif` was made that way: clips of the deck 1 opening, a wave
-  coming in, the Brood Mother and the Warden, picked from two recorded bot runs.
+  `docs/previews/gameplay.gif` was made that way: clips of the deck 1 opening, the bot
+  using the weapon wheel, a wave coming in, the Brood Mother and the Warden, picked from
+  two recorded bot runs.
 - **Tests:** world parsing/connectivity (every spawn reachable), autotile vs the Python
   golden data, collision, line of sight, flow-field following, metadata completeness,
   facing sectors, doors, the wave → boss → clear flow, reloading, pickups, music choice, and full rounds
@@ -269,7 +270,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   and then reloading and pickups (November 2026) the handicapped bot beat deck 1 in 11/20
   games (~4.6/8 HP left) and deck 2 in 10/20 (~4.0/8), in ~150 s each; most deaths were to
   the bosses. Those numbers were partly the bot getting stuck (~4% of its time): once it
-  stopped (below) it beats deck 1 in 19/20 and deck 2 in 16/20 with ~4.6/8 HP left. The
+  stopped (below) it beats deck 1 in 18/20 and deck 2 in 13/20 with ~5/8 HP left (with
+  the weapon wheel use below). The
   game itself wasn't retuned after that; if it now feels easy to a person, raise difficulty
   and the guard-rail together. Reload time was the biggest lever (1.2 s rifle reloads dropped deck 1 to
   2/20); for the Warden it was its attack rate (2.0 s → 3/20, 2.4 s → 10/20). Explosive
@@ -279,6 +281,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   drops it can use when nothing is in sight. It walks the flow-field path toward targets
   over 150 px away, strafes only with 14 px of room to the side (else advances), backs off
   sideways when blocked behind, and takes a 0.5 s detour after 0.75 s of not moving.
+  When no enemy is within 120 px it switches guns with the weapon wheel like a person
+  (holds Q for 0.45 s, sweeping the mouse toward the gun), otherwise with number keys.
   Pickups never drop where the player can't stand (`reachableNear`). Levers: each deck's `waves`, boss `hp` and `cooldown`,
   `waveHeal`, `reload_ms`, `dropChance`.
 - Destructible crates that drop pickups; ammo is plentiful for the bot, so `dropChance`

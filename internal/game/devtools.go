@@ -42,9 +42,24 @@ type autopilot struct {
 	flip            float64
 	lastPos, detour geom.Vec
 	stillT, detourT float64
+
+	// weapon wheel: when nothing is close it switches guns like a person
+	// would with Q (hold, sweep the mouse toward the gun, release)
+	wheelTo     int // slot being picked, -1 when not using the wheel
+	wheelT      float64
+	wheelOrigin geom.Vec
 }
 
-func newAutopilot() *autopilot { return &autopilot{mouse: geom.V(ScreenW/2+60, ScreenH/2), flip: 1} }
+func newAutopilot() *autopilot {
+	return &autopilot{mouse: geom.V(ScreenW/2+60, ScreenH/2), flip: 1, wheelTo: -1}
+}
+
+// Bot timing for the weapon wheel: how long it holds Q, and how close an
+// enemy may be before it switches with a number key instead.
+const (
+	botWheelHold = 0.45
+	botWheelCalm = 120.0
+)
 
 func newHumanAutopilot() *autopilot {
 	a := newAutopilot()
@@ -117,7 +132,19 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	if p.Mag[slot] == 0 && !g.canReload(slot) {
 		slot = pistol // it never runs dry
 	}
-	if slot != p.Slot {
+	switch {
+	case a.wheelTo >= 0: // mid-pick: hold Q and sweep toward the gun, then let go
+		a.wheelT += tick
+		in.WheelHeld = a.wheelT < botWheelHold
+		dir := wheelSlotPos(a.wheelTo, len(g.weapons)).Sub(geom.V(ScreenW/2, ScreenH/2)).Norm()
+		in.Mouse = a.wheelOrigin.Add(dir.Scale(40 * math.Min(a.wheelT/(botWheelHold*0.7), 1)))
+		if !in.WheelHeld {
+			a.wheelTo = -1
+		}
+	case slot != p.Slot && (vis == nil || dv > botWheelCalm) && p.ReloadT == 0:
+		a.wheelTo, a.wheelT, a.wheelOrigin = slot, 0, in.Mouse
+		in.WheelHeld = true
+	case slot != p.Slot:
 		in.SelectSlot = slot
 	}
 	if vis != nil {
