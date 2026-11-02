@@ -45,7 +45,26 @@ func (g *Game) maybeDrop(e *Enemy) {
 	if g.rng.Float64() < healthChance {
 		kind = pickHealth
 	}
-	g.pickups = append(g.pickups, &Pickup{Kind: kind, Pos: e.Pos})
+	if pos, ok := g.reachableNear(e.Pos); ok {
+		g.pickups = append(g.pickups, &Pickup{Kind: kind, Pos: pos})
+	}
+}
+
+// reachableNear finds a spot at or next to pos where the player can stand (a
+// drone can die above a crate or against a wall), or reports false.
+func (g *Game) reachableNear(pos geom.Vec) (geom.Vec, bool) {
+	for _, r := range []float64{0, 12, 24} {
+		for i := 0; i < 8; i++ {
+			p := pos.Add(geom.FromAngle(float64(i) * math.Pi / 4).Scale(r))
+			if !g.lvl.RectBlocked(p, playerHW, playerHH, false) && g.lvl.DoorAt(int(p.X/world.T), int(p.Y/world.T)) == nil {
+				return p, true
+			}
+			if r == 0 {
+				break
+			}
+		}
+	}
+	return pos, false
 }
 
 func (g *Game) updatePickups() {
@@ -65,25 +84,37 @@ func (g *Game) updatePickups() {
 	g.pickups = keep
 }
 
-// collect applies a pickup, or reports false (leaving it on the floor) when
-// the player has no use for it.
-func (g *Game) collect(pk *Pickup) bool {
+// wants reports whether the player has a use for a pickup; one they don't
+// stays on the floor.
+func (g *Game) wants(pk *Pickup) bool {
 	p := g.player
 	if pk.Kind == pickHealth {
-		if p.HP >= playerMaxHP {
-			return false
+		return p.HP < playerMaxHP
+	}
+	for i, w := range g.weapons[:g.unlocked] {
+		if w.Ammo > 0 && p.Spare[i] < w.Ammo {
+			return true
 		}
+	}
+	return false
+}
+
+// collect applies a pickup, or reports false when the player has no use for it.
+func (g *Game) collect(pk *Pickup) bool {
+	if !g.wants(pk) {
+		return false
+	}
+	p := g.player
+	if pk.Kind == pickHealth {
 		p.HP = min(p.HP+pickupHP, playerMaxHP)
 		return true
 	}
-	got := false
 	for i, w := range g.weapons[:g.unlocked] {
-		if w.Ammo > 0 && p.Spare[i] < w.Ammo {
+		if w.Ammo > 0 {
 			p.Spare[i] = min(p.Spare[i]+w.Ammo/2, w.Ammo)
-			got = true
 		}
 	}
-	return got
+	return true
 }
 
 func (g *Game) drawPickup(dst *ebiten.Image, pk *Pickup, cam geom.Vec) {

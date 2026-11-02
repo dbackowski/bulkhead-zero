@@ -265,3 +265,42 @@ func TestPickups(t *testing.T) {
 		t.Fatal("pickup never timed out")
 	}
 }
+
+// The bot shouldn't spend time pushing against walls, doors or props: count
+// the seconds it wants to move but stays within 6 px for 2 s, over a few
+// games of each deck.
+func TestAutopilotDoesNotGetStuck(t *testing.T) {
+	stuck, played := 0, 0.0
+	for lvl := range levels {
+		for seed := int64(1); seed <= 5; seed++ {
+			g, err := New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			g.rng = rand.New(rand.NewSource(seed))
+			g.level = lvl
+			if err := g.reset(); err != nil {
+				t.Fatal(err)
+			}
+			g.autopilot = newHumanAutopilot()
+			var hist []geom.Vec
+			for i := 0; i < 60*240 && g.level == lvl && g.state == statePlaying && !g.player.Dead; i++ {
+				in := g.autopilot.input(g, Input{})
+				if err := g.step(in); err != nil {
+					t.Fatal(err)
+				}
+				played += tick
+				if hist = append(hist, g.player.Pos); len(hist) > 120 {
+					hist = hist[1:]
+				}
+				if i%60 == 0 && len(hist) == 120 && in.Move.Len() > 0.1 && hist[0].Dist(g.player.Pos) < 6 {
+					stuck++
+				}
+			}
+		}
+	}
+	t.Logf("stuck %d s of %.0f s played", stuck, played)
+	if float64(stuck) > played*0.02 {
+		t.Errorf("the bot was stuck %d s of %.0f s", stuck, played)
+	}
+}

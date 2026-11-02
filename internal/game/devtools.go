@@ -36,9 +36,15 @@ type autopilot struct {
 	aimErr, reaction float64
 	wobble           geom.Vec
 	seen, lost       float64
+
+	// strafing side (flipped when that side is blocked), and getting unstuck:
+	// wanting to move but staying put for a moment triggers a short detour
+	flip            float64
+	lastPos, detour geom.Vec
+	stillT, detourT float64
 }
 
-func newAutopilot() *autopilot { return &autopilot{mouse: geom.V(ScreenW/2+60, ScreenH/2)} }
+func newAutopilot() *autopilot { return &autopilot{mouse: geom.V(ScreenW/2+60, ScreenH/2), flip: 1} }
 
 func newHumanAutopilot() *autopilot {
 	a := newAutopilot()
@@ -125,10 +131,12 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	// the nearest pickup it has a use for
 	var pick *Pickup
 	for _, pk := range g.pickups {
-		useful := pk.Kind == pickAmmo || p.HP < playerMaxHP
-		if useful && pk.T < pickupLife-3 && (pick == nil || pk.Pos.Dist(p.Pos) < pick.Pos.Dist(p.Pos)) {
+		if g.wants(pk) && pk.T < pickupLife-3 && (pick == nil || pk.Pos.Dist(p.Pos) < pick.Pos.Dist(p.Pos)) {
 			pick = pk
 		}
+	}
+	free := func(dir geom.Vec, px float64) bool { // a step of px that way isn't blocked
+		return !g.lvl.RectBlocked(p.Pos.Add(dir.Norm().Scale(px)), playerHW, playerHH, false)
 	}
 	goTo := func(target geom.Vec) {
 		a.fieldTime -= dt
@@ -142,22 +150,53 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		}
 	}
 
-	// movement: back off from close melee enemies, strafe while shooting,
-	// otherwise grab pickups, otherwise hunt
+	// movement: back off from close melee enemies, strafe while shooting at
+	// mid range, walk the path toward far targets, otherwise grab pickups,
+	// otherwise hunt. Sideways moves switch sides when that side is blocked.
 	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, brood: 60}
-	switch {
-	case vis != nil && (dv < backOff[vis.Kind]):
-		in.Move = p.Pos.Sub(vis.Pos).Norm().Add(geom.V(math.Sin(a.t*2), 0).Scale(0.6))
-	case vis != nil:
-		to := vis.Pos.Sub(p.Pos).Norm()
-		in.Move = geom.V(-to.Y, to.X).Scale(math.Copysign(1, math.Sin(a.t*0.9)))
-		if dv > 150 {
-			in.Move = in.Move.Add(to)
+	var to, side geom.Vec
+	if vis != nil {
+		to = vis.Pos.Sub(p.Pos).Norm()
+		side = geom.V(-to.Y, to.X).Scale(math.Copysign(1, math.Sin(a.t*0.9)) * a.flip)
+		if !free(side, 14) {
+			a.flip, side = -a.flip, side.Scale(-1)
 		}
+		if !free(side, 14) {
+			side = geom.Vec{} // no room to strafe (a corridor, a doorway)
+		}
+	}
+	switch {
+	case a.detourT > 0:
+		a.detourT -= dt
+		in.Move = a.detour
+	case vis != nil && dv < backOff[vis.Kind]:
+		in.Move = to.Scale(-1).Add(side.Scale(0.6))
+		if !free(in.Move, 6) {
+			in.Move = side
+		}
+	case vis != nil && dv <= 150 && side != (geom.Vec{}):
+		in.Move = side
+	case vis != nil:
+		goTo(vis.Pos)
 	case pick != nil:
 		goTo(pick.Pos)
 	case near != nil:
 		goTo(near.Pos)
+	}
+
+	// safety net: wanting to move but not getting anywhere for a moment means
+	// something is in the way, so take a short detour in a free direction
+	if in.Move.Len() < 0.1 || p.Pos.Dist(a.lastPos) > 3 {
+		a.lastPos, a.stillT = p.Pos, 0
+	} else if a.stillT += dt; a.stillT > 0.75 && a.detourT <= 0 {
+		for i := 0; i < 8; i++ {
+			d := geom.FromAngle(in.Move.Angle() + math.Pi/2 + float64(i)*math.Pi/4)
+			if free(d, 6) {
+				a.detour, a.detourT = d, 0.5
+				break
+			}
+		}
+		a.stillT = 0
 	}
 	return in
 }

@@ -256,22 +256,30 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   (clear, death, restart, barrel chains), and walking through every wave of both decks.
   `TestDifficulty` plays 20 seeded games of each deck (all waves and the boss) with the
   handicapped bot and fails if it beats the boss in under half of them or keeps over 75% HP
-  on average; run it with `-v` while tuning. `TestMapsAreConnected` checks every map:
-  everything reachable, a boss spot, outer doors that open onto floor.
+  on average; run it with `-v` while tuning. `TestAutopilotDoesNotGetStuck` fails if the bot
+  spends over 2% of its time wanting to move but staying within 6 px for 2 s.
+  `TestMapsAreConnected` checks every map: everything reachable, a boss spot, outer doors
+  that open onto floor.
 
 ## Next steps
 
 - **Difficulty: play-test it.** Tuned against the bots only: player 8 HP and 0.45 s
   invulnerability; crawlers 4 HP at 70 px/s; drones 7 HP; ranged cooldowns 2.0 s; shots lead
   the player (`globLead`, `laserLead`, `laserSpeed` in `enemy.go`). With waves and the boss
-  and then reloading and pickups (November 2026) the handicapped bot beats deck 1 in 11/20
-  games (~4.6/8 HP left) and deck 2 in 10/20 (~4.0/8), in ~150 s each; most deaths are to
-  the bosses. Reload time was the biggest lever (1.2 s rifle reloads dropped deck 1 to
+  and then reloading and pickups (November 2026) the handicapped bot beat deck 1 in 11/20
+  games (~4.6/8 HP left) and deck 2 in 10/20 (~4.0/8), in ~150 s each; most deaths were to
+  the bosses. Those numbers were partly the bot getting stuck (~4% of its time): once it
+  stopped (below) it beats deck 1 in 19/20 and deck 2 in 16/20 with ~4.6/8 HP left. The
+  game itself wasn't retuned after that; if it now feels easy to a person, raise difficulty
+  and the guard-rail together. Reload time was the biggest lever (1.2 s rifle reloads dropped deck 1 to
   2/20); for the Warden it was its attack rate (2.0 s → 3/20, 2.4 s → 10/20). Explosive
   barrels on the bot's routes and enemies covering an entrance also cost a lot: keep them
   off the main paths when editing maps. The bot uses rifle/shotgun/pistol, the smg once
   unlocked and plasma against the Warden, finishes reloads before switching, and picks up
-  drops when nothing is in sight. Levers: each deck's `waves`, boss `hp` and `cooldown`,
+  drops it can use when nothing is in sight. It walks the flow-field path toward targets
+  over 150 px away, strafes only with 14 px of room to the side (else advances), backs off
+  sideways when blocked behind, and takes a 0.5 s detour after 0.75 s of not moving.
+  Pickups never drop where the player can't stand (`reachableNear`). Levers: each deck's `waves`, boss `hp` and `cooldown`,
   `waveHeal`, `reload_ms`, `dropChance`.
 - Destructible crates that drop pickups; ammo is plentiful for the bot, so `dropChance`
   and `ammo` could tighten if it never feels scarce.
