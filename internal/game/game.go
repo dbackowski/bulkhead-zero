@@ -20,8 +20,13 @@ import (
 const (
 	ScreenW = 480
 	ScreenH = 270
-	dt      = 1.0 / 60
+	tick    = 1.0 / 60 // real time per Update
 )
+
+// dt is the game time simulated by this Update: tick, or less while the
+// weapon wheel slows time down.
+// ponytail: package-level so its many uses needed no parameter; fine with one Game per process.
+var dt = tick
 
 type state int
 
@@ -73,6 +78,7 @@ type Game struct {
 	recorder   *recorder
 	sfx        *sfx // nil when muted at launch
 	fullscreen bool
+	wheel      weaponWheel
 }
 
 // New loads assets and starts a fresh round.
@@ -136,6 +142,7 @@ func (g *Game) reset() error {
 	g.bullets, g.shots, g.fx, g.scorches, g.blasts, g.pickups = nil, nil, nil, nil, nil, nil
 	g.state, g.stateT, g.t = statePlaying, 0, 0
 	g.say(g.deck().name, 3)
+	g.wheel = weaponWheel{}
 	g.flow = lvl.DistanceField(g.player.Pos)
 	g.cam = g.cameraTarget(geom.V(ScreenW/2, ScreenH/2))
 	return nil
@@ -153,6 +160,11 @@ func (g *Game) Update() error {
 	if g.autopilot != nil {
 		in = g.autopilot.input(g, in)
 	}
+	return g.step(in)
+}
+
+// step runs one tick with the given input (tests drive the game through it).
+func (g *Game) step(in Input) error {
 	if in.Fullscreen {
 		g.fullscreen = !g.fullscreen
 		ebiten.SetFullscreen(g.fullscreen)
@@ -177,7 +189,13 @@ func (g *Game) Update() error {
 	}
 	g.updateMusic()
 	if g.state == statePaused {
+		g.wheel.open = false
 		return nil
+	}
+	in = g.updateWheel(in)
+	dt = tick
+	if g.wheel.open {
+		dt = tick * wheelSlowMo
 	}
 	g.t += dt
 	g.stateT += dt

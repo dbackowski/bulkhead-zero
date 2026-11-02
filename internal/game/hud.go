@@ -84,14 +84,14 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 		f.Draw(dst, fmt.Sprintf("DECK %d  WAVE %d/%d", g.level+1, g.wave, g.waveCount()), 5, 5, 1, textAmber)
 		f.Draw(dst, fmt.Sprintf("HOSTILES %d/%d", g.aliveFoes()+len(g.queue), g.totalFoes), 5, 15, 1, textDim)
 	}
-	if g.state == statePlaying && g.bannerT > 0 {
+	if g.state == statePlaying && g.bannerT > 0 && !g.wheel.open {
 		title := color.Color(textAmber)
 		if g.boss != nil {
 			title = textRed
 		}
 		g.printCentered(dst, g.banner, 56, title)
 	}
-	if g.state == statePlaying && g.nextIn > 0 && g.aliveFoes() == 0 && len(g.queue) == 0 {
+	if g.state == statePlaying && g.nextIn > 0 && g.aliveFoes() == 0 && len(g.queue) == 0 && !g.wheel.open {
 		next := fmt.Sprintf("WAVE %d", g.wave+1)
 		if g.wave == g.waveCount() {
 			next = "SOMETHING BIG"
@@ -99,8 +99,10 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 		g.printCentered(dst, fmt.Sprintf("%s IN %d", next, int(math.Ceil(g.nextIn))), 100, nil)
 	}
 
+	g.drawWheel(dst)
+
 	// crosshair at the cursor
-	if g.state == statePlaying {
+	if g.state == statePlaying && !g.wheel.open {
 		mx, my := ebiten.CursorPosition()
 		if g.autopilot != nil {
 			mx, my = int(g.autopilot.mouse.X), int(g.autopilot.mouse.Y)
@@ -110,8 +112,8 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 
 	switch g.state {
 	case statePlaying:
-		if g.t < 7 && g.bannerT <= 0 {
-			g.printCentered(dst, "WASD MOVE   MOUSE AIM   LMB FIRE   R RELOAD\n1-6 / Q / WHEEL WEAPON   ESC PAUSE", 40, nil)
+		if g.t < 7 && g.bannerT <= 0 && !g.wheel.open {
+			g.printCentered(dst, "WASD MOVE   MOUSE AIM   LMB FIRE   R RELOAD\n1-6 / HOLD Q / WHEEL WEAPON   ESC PAUSE", 40, nil)
 		}
 	case statePaused:
 		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)

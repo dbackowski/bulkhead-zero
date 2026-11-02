@@ -192,7 +192,7 @@ func newRecorder(dir string) *recorder {
 func (r *recorder) tick(g *Game) {
 	r.frame++
 	r.pending = r.frame%r.every == 0
-	if float64(r.frame)*dt >= r.limit {
+	if float64(r.frame)*tick >= r.limit {
 		r.done = true
 	}
 }

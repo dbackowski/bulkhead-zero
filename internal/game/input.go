@@ -15,6 +15,7 @@ type Input struct {
 	FirePressed bool     // trigger pressed this tick (semi-auto weapons)
 	SelectSlot  int      // 0..n-1, or -1
 	Cycle       int      // -1, 0, +1
+	WheelHeld   bool     // Q held: weapon wheel
 	Reload      bool
 	Restart     bool
 	Pause       bool
@@ -46,9 +47,7 @@ func readInput(g *Game) Input {
 			in.SelectSlot = i
 		}
 	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyQ) {
-		in.Cycle = 1
-	}
+	in.WheelHeld = ebiten.IsKeyPressed(ebiten.KeyQ)
 	if _, wy := ebiten.Wheel(); wy > 0 {
 		in.Cycle = -1
 	} else if wy < 0 {

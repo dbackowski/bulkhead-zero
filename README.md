@@ -21,7 +21,8 @@ go run .
 | Move | WASD or arrows |
 | Aim / fire | Mouse / left button |
 | Reload | R |
-| Weapons | 1 pistol, 2 rifle, 3 shotgun, 4 smg, 5 plasma, 6 launcher; Q or wheel to cycle |
+| Weapons | 1 pistol, 2 rifle, 3 shotgun, 4 smg, 5 plasma, 6 launcher, or the mouse wheel |
+| Weapon wheel | Hold Q, point the mouse at a gun, release (time slows while it's open; a tap cycles) |
 | Pause / fullscreen / mute | Esc or P / F / M |
 | Restart | R in the pause menu, or R / click after dying or winning |
 
