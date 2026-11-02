@@ -453,6 +453,22 @@ def warden_death(rng, v):
                          0.35, size=1.5, decay=0.84), fade=0.3)
 
 
+def burrow(rng, v):
+    """The Maw digs in: a low grinding rumble with stones cracking in it."""
+    n = int(1.3 * RATE)
+    rumble = biquad(noise(rng, n), "lp", 140 + 15 * v)
+    rumble = [x * min(1.0, i / (0.15 * RATE)) for i, x in enumerate(rumble)]
+    cracks = [0.0] * n
+    for _ in range(14):
+        i = int(rng.uniform(0, 1.1) * RATE)
+        for j in range(int(0.02 * RATE)):
+            if i + j < n:
+                cracks[i + j] += rng.uniform(-1, 1) * math.exp(-j / (0.004 * RATE))
+    groan = scale(fm(n, sweep(90 + 5 * v, 50, 0.6), 17, 0.4, 1.2), 0.5)
+    return finish(reverb(mix(drive(scale(rumble, 3.0), 2.0), scale(biquad(cracks, "bp", 900, q=1.2), 0.6), groan),
+                         0.3, size=1.3), fade=0.2)
+
+
 # name: (generator(rng, variant) -> samples, loudness). Loudness is the RMS of
 # the loudest 50 ms above 200 Hz, i.e. roughly how loud it sounds on laptop
 # speakers, so these numbers compare directly; peaks are capped at 0.9.
@@ -489,6 +505,7 @@ SOUNDS = {
     "dry_fire": (dry_fire, 0.08),
     "warden_alarm": (warden_alarm, 0.22),
     "warden_death": (warden_death, 0.30),
+    "burrow": (burrow, 0.22),
 }
 
 

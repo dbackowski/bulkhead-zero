@@ -89,7 +89,7 @@ func (g *Game) stepBullet(b *Bullet) bool {
 		b.Ground = b.Ground.Add(step)
 		visual := b.Ground.Sub(geom.V(0, b.H))
 		for _, e := range g.enemies {
-			if e.State == stDead || slices.Contains(b.hit, e) {
+			if e.State == stDead || e.hidden() || slices.Contains(b.hit, e) {
 				continue
 			}
 			if b.Ground.Dist(e.Pos) < stats[e.Kind].radius {

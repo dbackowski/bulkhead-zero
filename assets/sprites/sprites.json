@@ -434,6 +434,27 @@
         "frame_ms": 130,
         "loop": false,
         "size": 48
+      },
+      "maw.idle": {
+        "row": 6,
+        "frames": 8,
+        "frame_ms": 180,
+        "loop": true,
+        "size": 48
+      },
+      "maw.attack": {
+        "row": 7,
+        "frames": 4,
+        "frame_ms": 90,
+        "loop": false,
+        "size": 48
+      },
+      "maw.death": {
+        "row": 8,
+        "frames": 6,
+        "frame_ms": 130,
+        "loop": false,
+        "size": 48
       }
     }
   },

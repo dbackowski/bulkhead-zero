@@ -75,10 +75,13 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		in.Restart = g.stateT > 2.5
 		return in
 	}
-	var vis, near *Enemy
+	var vis, near, dig *Enemy
 	var dv, dn float64
 	for _, e := range g.enemies {
-		if e.State == stDead {
+		if _, warn, wt := e.mawPhase(); warn && wt > a.reaction && e.Pos.Dist(p.Pos) < mawBurst {
+			dig = e // about to burst out right here
+		}
+		if e.State == stDead || e.hidden() {
 			continue
 		}
 		d := e.Pos.Dist(p.Pos)
@@ -180,7 +183,7 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	// movement: back off from close melee enemies, strafe while shooting at
 	// mid range, walk the path toward far targets, otherwise grab pickups,
 	// otherwise hunt. Sideways moves switch sides when that side is blocked.
-	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, brood: 60}
+	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, brood: 60, maw: 50}
 	var to, side geom.Vec
 	if vis != nil {
 		to = vis.Pos.Sub(p.Pos).Norm()
@@ -193,6 +196,11 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		}
 	}
 	switch {
+	case dig != nil: // step off the marked spot
+		in.Move = p.Pos.Sub(dig.Pos)
+		if in.Move.Len() < 1 {
+			in.Move = geom.FromAngle(a.flip)
+		}
 	case a.detourT > 0:
 		a.detourT -= dt
 		in.Move = a.detour

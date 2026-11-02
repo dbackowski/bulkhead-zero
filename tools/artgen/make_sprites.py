@@ -959,6 +959,83 @@ def warden_anims():
 
 
 # ============================================================================
+# BOSS 3 - the Maw, a giant worm rising out of the hydroponic beds. 48x48,
+# faces the camera. It burrows: the game sinks and raises it by cropping
+# frames at the feet, so the hole is drawn at the bottom of every frame.
+# ============================================================================
+def maw_hole(img):
+    ellipse(img, 24, 43, 14, 3.6, OUT)
+    ellipse(img, 24, 43.5, 12, 2.4, (10, 8, 6, 255))
+    for rx, ry, c in ((9, 41, (86, 62, 40, 255)), (37, 42, (86, 62, 40, 255)), (12, 45, (60, 44, 30, 255)),
+                      (34, 45, (60, 44, 30, 255)), (17, 40, G1), (31, 40, G1)):
+        ellipse(img, rx, ry, 2.2, 1.3, c)                                # rubble and broken plating
+
+
+def maw(sway=0, open=0, glow=0, droop=0, wreck=False, hole=True):
+    img = new(B, B)
+    if hole:
+        maw_hole(img)
+    hx, hy = 24 + sway + droop, 15 + droop * .6                         # head centre
+    for i in range(6, -1, -1):                                           # body rings, bottom up
+        k = i / 6
+        sx = 24 + (hx - 24) * (1 - k) ** 2 + math.sin(k * 3) * sway * .5
+        sy = 43 - (43 - hy - 7) * (1 - k)
+        r = 7.5 + 2.5 * k                                                # wider where it leaves the hole
+        ellipse(img, sx, sy, r, 4.2, M0)
+        ellipse(img, sx, sy - .8, r - .8, 3.2, M1)
+        ellipse(img, sx - r * .35, sy - 1.6, r * .4, 1.2, M2)            # sheen, lit from the top left
+        if i % 2:
+            put(img, sx + r * .55, sy - .5, ACID_D)                      # pores
+    ellipse(img, hx, hy, 12.5, 10, OUT)                                  # head
+    ellipse(img, hx, hy, 11.5, 9, M1)
+    ellipse(img, hx - 2, hy - 3, 8, 5, M2)
+    ellipse(img, hx - 4, hy - 5, 3, 1.4, M3)
+    mr = 3 + open * 1.6                                                  # mouth, facing us
+    ellipse(img, hx, hy + 1, mr + 1.5, mr * .8 + 1.5, M0)
+    ellipse(img, hx, hy + 1, mr, mr * .8, RED_DD)
+    if open:
+        ellipse(img, hx, hy + 1.5, mr - 1.5, mr * .8 - 1.2, RED_D)
+        ellipse(img, hx, hy + 2, 1 + glow, .8 + glow * .6, ACID if glow else ACID_D)
+    for t in range(10):                                                  # ring of teeth
+        a = t / 10 * 2 * math.pi
+        put(img, hx + math.cos(a) * (mr + .6), hy + 1 + math.sin(a) * (mr * .8 + .6), BONE)
+    for ex, ey in ((-8, -2), (8, -2), (-6, 5), (6, 5)):                  # eye spots
+        put(img, hx + ex, hy + ey, FLASH2 if glow else AMB)
+    if glow > 1:
+        put(img, hx, hy + 4 + open, ACID)                                # drool
+        put(img, hx, hy + 5 + open, ACID_D)
+    out = outline(img)
+    if wreck:
+        rng = random.Random(9)
+        for _ in range(30):
+            put(out, rng.randint(14, 34), rng.randint(int(hy) - 6, 40), rng.choice([M0, RED_DD, ACID_D]))
+    return out
+
+
+def maw_anims():
+    a = {}
+    a["idle"] = [boss_shadow(maw(sway=s, open=o), rx=15)
+                 for s, o in ((0, 0), (1, 1), (2, 0), (1, 1), (0, 0), (-1, 1), (-2, 0), (-1, 1))]
+    a["attack"] = [boss_shadow(maw(open=o, glow=g), rx=15) for o, g in ((1, 1), (2, 2), (3, 2), (2, 1))]
+    dead = []
+    for i, (droop, sink) in enumerate(((0, 0), (3, 0), (6, 4), (6, 12), (6, 22), (6, 34))):
+        spr = maw(open=3 if i < 2 else 1, droop=droop, wreck=i >= 2, hole=not sink)
+        if i == 0:
+            spr = tint(spr, WHITE, .85)
+        if sink:  # slides back down into its hole: shift it down, cut it off at the hole
+            body = spr.crop((0, 0, B, 43 - sink))
+            spr = new(B, B)
+            maw_hole(spr)
+            spr = outline(spr)
+            spr.alpha_composite(body, (0, sink))
+            if i == 5:
+                ellipse(spr, 24, 43, 4, 1.2, ACID_D)                    # it leaves a puddle
+        dead.append(boss_shadow(spr, rx=15))
+    a["death"] = dead
+    return a
+
+
+# ============================================================================
 # FX - projectiles and impacts (game rotates bullets/lasers to their heading)
 # ============================================================================
 def fx_anims():
@@ -1153,6 +1230,7 @@ def build_all():
         "brute": brute_anims(),
         "boss": boss_anims(),
         "warden": warden_anims(),
+        "maw": maw_anims(),
         "fx": fx,
     }
 
@@ -1201,7 +1279,8 @@ def main():
                                                   ("drone.", all_["drone"]),
                                                   ("bomber.", all_["bomber"]),
                                                   ("brute.", all_["brute"])])
-    b_sheet, b_meta = write_sheet("bosses.png", [("brood.", all_["boss"]), ("warden.", all_["warden"])], size=B)
+    b_sheet, b_meta = write_sheet("bosses.png", [("brood.", all_["boss"]), ("warden.", all_["warden"]),
+                                                ("maw.", all_["maw"])], size=B)
     t_sheet, t_meta = font_sheet()
     t_sheet.save("font.png")
     f_sheet, f_meta = write_sheet("fx.png", [("", all_["fx"])])

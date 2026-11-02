@@ -18,13 +18,18 @@ const (
 	brute  // slow and tough, charges
 	brood  // boss of deck 1, the Brood Mother
 	warden // boss of deck 2, a security mech
+	maw    // boss of deck 3, a giant worm that burrows
 )
 
 // Map letters for each kind (see world/level.go), also used by the wave
 // lists; the bosses' letters are only used by the level list.
-var kindFor = map[byte]enemyKind{'C': crawler, 'S': spitter, 'R': drone, 'E': bomber, 'G': brute, 'M': brood, 'W': warden}
+var kindFor = map[byte]enemyKind{'C': crawler, 'S': spitter, 'R': drone, 'E': bomber, 'G': brute, 'M': brood, 'W': warden, 'O': maw}
 
-func (e *Enemy) isBoss() bool { return e.Kind == brood || e.Kind == warden }
+func (e *Enemy) isBoss() bool { return e.Kind == brood || e.Kind == warden || e.Kind == maw }
+
+// hidden is true while the Maw is underground (or sinking, or rising): it
+// can't be hit or touched then.
+func (e *Enemy) hidden() bool { return e.State == stUnder }
 
 type enemyState int
 
@@ -33,6 +38,7 @@ const (
 	stChase
 	stAttack
 	stDead
+	stUnder // the Maw, burrowing
 )
 
 // Per-kind tuning. Starting values from the art previews; tune freely.
@@ -56,6 +62,8 @@ var stats = map[enemyKind]enemyStats{
 	brute:  {hp: 20, radius: 11, aggro: 190, speed: 30, cooldown: 2.4, attackLen: 1.15, fireAt: 0.55},
 	brood:  {hp: 120, radius: 17, aggro: 999, speed: 24, cooldown: 1.6, attackLen: 0.7, fireAt: 0.35},
 	warden: {hp: 80, radius: 16, aggro: 999, speed: 22, cooldown: 2.4, attackLen: 0.8, fireAt: 0.3},
+	// maw: speed is how fast it digs toward the player underground
+	maw: {hp: 100, radius: 15, aggro: 999, speed: 105, cooldown: 2.2, attackLen: 0.6, fireAt: 0.3},
 }
 
 // Enemy shots: how far ahead they aim (seconds of player movement) and laser speed (px/s).
@@ -70,6 +78,15 @@ const (
 	mortarBlast = 30.0  // px, the Warden's shells
 	fanSpeed    = 190.0 // the Warden's laser fan: slower than a drone's shot
 	fanGap      = 0.24  // radians between its bolts
+
+	// the Maw's burrow, in seconds: sinking, digging toward the player,
+	// waiting under a marked spot, then rising out in a burst
+	mawSink   = 0.45
+	mawDig    = 1.6
+	mawWarn   = 0.7
+	mawRise   = 0.4
+	mawBurst  = 38.0 // px, the burst as it comes up
+	mawGlobAt = 26.0 // px between the globs of its acid line
 )
 
 // Enemy is any hostile. Pos is the feet (or, for the drone, its shadow).
@@ -171,6 +188,8 @@ func (g *Game) updateEnemy(e *Enemy) {
 		g.updateBrute(e, st, d, los)
 	case brood, warden:
 		g.updateBoss(e, st, d, los)
+	case maw:
+		g.updateMaw(e, st, d, los)
 	}
 }
 
@@ -415,6 +434,156 @@ func (g *Game) broodAttack(e *Enemy, enraged bool) {
 	}
 }
 
+// updateMaw runs the deck 3 boss. It never walks: above ground it spits a
+// line of acid or a cone of spines at the player, and in between it burrows,
+// digs toward the player and bursts out under a marked spot with a ring of
+// spines. Out of sight of the player it always burrows. Below half health it
+// digs faster, every attack is bigger and it brings crawlers up with it.
+func (g *Game) updateMaw(e *Enemy, st enemyStats, d float64, los bool) {
+	enraged := e.HP*2 < st.hp
+	dig := mawDig
+	if enraged {
+		dig *= 0.7
+	}
+	switch e.State {
+	case stUnder:
+		switch {
+		case e.T < mawSink:
+		case e.T < mawSink+dig:
+			if d < 8 { // right under the player: stop and warn
+				e.T = mawSink + dig
+				break
+			}
+			e.Pos = g.lvl.MoveAndSlide(e.Pos, g.chaseDir(e, los, d).Scale(st.speed*dt), 8, 5, false)
+		case e.T < mawSink+dig+mawWarn:
+		case !e.Fired:
+			e.Fired = true
+			g.mawBurst(e, enraged)
+		case e.T >= mawSink+dig+mawWarn+mawRise:
+			e.setState(stChase)
+			e.CD = st.cooldown
+		}
+		return
+	case stAttack:
+		if !e.Fired && e.T >= st.fireAt {
+			e.Fired = true
+			if (e.Pattern-1)%4 == 0 {
+				g.mawAcid(e, enraged)
+			} else {
+				g.mawSpines(e, enraged)
+			}
+		}
+		if e.T >= st.attackLen {
+			e.setState(stChase)
+			e.CD = st.cooldown
+			if enraged {
+				e.CD *= 0.65
+			}
+		}
+	default:
+		if e.CD <= 0 {
+			pattern := e.Pattern % 4 // acid, burrow, spines, burrow
+			e.Pattern++
+			if pattern%2 == 1 || !los {
+				e.setState(stUnder)
+				g.sound("burrow", e.Pos)
+			} else {
+				e.setState(stAttack)
+			}
+		}
+	}
+	if d < 22 {
+		g.hurtPlayer(2, e.Pos) // touching it hurts
+	}
+}
+
+// mawPhase says how far out of the ground the Maw is (1 up, 0 under) and,
+// while it is about to burst out (the marker shows), for how long it has
+// been warning.
+func (e *Enemy) mawPhase() (up float64, warn bool, warnT float64) {
+	if e.State != stUnder {
+		return 1, false, 0
+	}
+	dig := mawDig
+	if e.HP*2 < stats[maw].hp {
+		dig *= 0.7
+	}
+	switch t := e.T; {
+	case t < mawSink:
+		return 1 - t/mawSink, false, 0
+	case t < mawSink+dig:
+		return 0, false, 0
+	case t < mawSink+dig+mawWarn:
+		return 0, true, t - mawSink - dig
+	default:
+		return math.Min((t-mawSink-dig-mawWarn)/mawRise, 1), false, 0
+	}
+}
+
+// mawBurst: the Maw comes up, blasting the floor and throwing a ring of spines.
+func (g *Game) mawBurst(e *Enemy, enraged bool) {
+	g.blast(e.Pos, mawBurst, 3)
+	n := 8
+	if enraged {
+		n = 12
+	}
+	from := e.Pos.Sub(geom.V(0, 6))
+	off := g.rng.Float64()
+	for i := 0; i < n; i++ {
+		a := (float64(i) + off) / float64(n) * 2 * math.Pi
+		g.shots = append(g.shots, &Shot{Kind: shotSpine, Ground: from, Vel: geom.FromAngle(a).Scale(spineSpeed), H: 16, Life: 3})
+	}
+	g.sound("boss_roar", from)
+	if enraged && g.aliveFoes() < 7 {
+		for i := 0; i < 2; i++ {
+			pos := e.Pos.Add(geom.FromAngle(float64(i)*math.Pi + g.rng.Float64()).Scale(26))
+			if g.lvl.RectBlocked(pos, 4, 3, false) {
+				pos = e.Pos
+			}
+			g.spawnHunter('C', pos)
+		}
+	}
+}
+
+// mawAcid spits a line of globs that land one after another, walking out
+// toward and past the player (three lines in a fan when enraged).
+func (g *Game) mawAcid(e *Enemy, enraged bool) {
+	p := g.player
+	from := e.Pos.Sub(geom.V(0, 14))
+	aim := p.Pos.Add(p.Vel.Scale(0.3)).Sub(e.Pos).Angle()
+	fan := []float64{0}
+	if enraged {
+		fan = []float64{-0.45, 0, 0.45}
+	}
+	for _, da := range fan {
+		dir := geom.FromAngle(aim + da)
+		for i := 0; i < 7; i++ {
+			to := e.Pos.Add(dir.Scale(30 + float64(i)*mawGlobAt))
+			if g.lvl.WallAt(to) {
+				break
+			}
+			g.shots = append(g.shots, &Shot{Kind: shotGlob, From: from, To: to, Ground: from,
+				Dur: 0.45 + float64(i)*0.11, H: 14})
+		}
+	}
+	g.sound("spit", from)
+}
+
+// mawSpines fires a cone of spines at the player.
+func (g *Game) mawSpines(e *Enemy, enraged bool) {
+	from := e.Pos.Sub(geom.V(0, 14))
+	n, spread := 5, 1.0
+	if enraged {
+		n, spread = 7, 1.3
+	}
+	aim := g.player.Pos.Sub(from).Angle()
+	for i := 0; i < n; i++ {
+		a := aim + (float64(i)/float64(n-1)-0.5)*spread
+		g.shots = append(g.shots, &Shot{Kind: shotSpine, Ground: from, Vel: geom.FromAngle(a).Scale(spineSpeed * 1.2), H: 16, Life: 3})
+	}
+	g.sound("spine", from)
+}
+
 func (g *Game) updateSpitter(e *Enemy, st enemyStats, d float64, los bool) {
 	p := g.player
 	switch e.State {
@@ -489,7 +658,7 @@ func (g *Game) updateDrone(e *Enemy, st enemyStats, d float64, los bool) {
 }
 
 func (g *Game) damageEnemy(e *Enemy, dmg int, from geom.Vec) {
-	if e.State == stDead {
+	if e.State == stDead || e.hidden() {
 		return
 	}
 	e.HP -= dmg
@@ -516,7 +685,7 @@ func (g *Game) kill(e *Enemy) {
 		g.shake(2, 0.15)
 	case bomber:
 		g.blast(e.Pos, bomberBlast, 3)
-	case brood, warden:
+	case brood, warden, maw:
 		g.say(bossName[e.Kind]+" DOWN", 2.5)
 		g.stinger("victory")
 		for i := 0; i < 6; i++ {
@@ -535,7 +704,7 @@ func (g *Game) kill(e *Enemy) {
 }
 
 var deathSound = map[enemyKind]string{crawler: "crawler_death", spitter: "spitter_death", drone: "drone_death",
-	bomber: "explosion", brute: "brute_death", brood: "boss_death", warden: "warden_death"}
+	bomber: "explosion", brute: "brute_death", brood: "boss_death", warden: "warden_death", maw: "boss_death"}
 
 // height is how far above the feet an enemy's body centre is (for aiming).
 func (e *Enemy) height() float64 {
@@ -546,6 +715,8 @@ func (e *Enemy) height() float64 {
 		return 20
 	case warden:
 		return 22
+	case maw:
+		return 26
 	}
 	return 7
 }

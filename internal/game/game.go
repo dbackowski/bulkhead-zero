@@ -1,4 +1,4 @@
-// Package game is the playable prototype: two station decks, each fought in
+// Package game is the playable prototype: three station decks, each fought in
 // waves ending with a boss, the marine, five enemy types, weapons, camera and HUD.
 package game
 

@@ -123,6 +123,6 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 		g.printCentered(dst, "YOU DIED\n\nR OR CLICK TO TRY AGAIN", 110, textRed)
 	case stateClear:
 		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)
-		g.printCentered(dst, "STATION CLEARED\nBOTH DECKS ARE SAFE\n\nR OR CLICK TO PLAY AGAIN", 110, textGreen)
+		g.printCentered(dst, "STATION CLEARED\nALL DECKS ARE SAFE\n\nR OR CLICK TO PLAY AGAIN", 110, textGreen)
 	}
 }

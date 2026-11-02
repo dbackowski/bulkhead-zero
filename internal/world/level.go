@@ -19,13 +19,13 @@ const T = 24
 //	doors:  D door, = door that starts open. A door needs floor below it. With
 //	        floor above too it is an inner door that slides open for anyone
 //	        near; with wall above it is an outer door where wave enemies enter.
-//	floors: . plate  g grate  h hazard  v vent  s light strip
+//	floors: . plate  g grate  h hazard  v vent  s light strip  o grow bed (soil)
 //	decals: a acid  z scorch  ~ cables
 //	props:  x crate  c console  k locker  t terminal  b toxic barrel  B explosive barrel
 //	spawns: @ player  C crawler  S spitter  R drone  E bomber  G brute  Q boss
 const wallChars = "#LP!D="
 
-var floorChars = map[byte]string{'g': "floor_grate", 'h': "floor_hazard", 'v': "floor_vent", 's': "floor_lightstrip"}
+var floorChars = map[byte]string{'g': "floor_grate", 'h': "floor_hazard", 'v': "floor_vent", 's': "floor_lightstrip", 'o': "floor_soil"}
 var decalChars = map[byte]string{'a': "decal_acid", 'z': "decal_scorch", '~': "decal_cables"}
 var propChars = map[byte]string{'x': "crate", 'c': "console", 'k': "locker", 't': "terminal", 'b': "barrel_toxic", 'B': "barrel_explosive"}
 

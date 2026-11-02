@@ -28,7 +28,7 @@ go run .
 
 ## How it plays
 
-- **Two decks.** The Habitat, then the Reactor. Each is four waves and a boss: first clear
+- **Three decks.** The Habitat, the Reactor, then Hydroponics. Each is four waves and a boss: first clear
   the enemies already on the deck, then the next waves come in through the outer doors.
   Beating the boss takes you to the next deck; dying restarts the deck you're on.
 - **Six guns.** You start with the pistol, rifle and shotgun; clearing waves unlocks the
@@ -42,11 +42,13 @@ go run .
   up to them; red barrels explode.
 - **Bosses.** The Brood Mother sprays rings of spines, lobs acid and summons her brood. The
   Warden, a security mech, keeps its distance, fires laser fans and mortar shells (orange
-  markers show where they hit) and launches drones.
+  markers show where they hit) and launches drones. The Maw, a giant worm in the grow beds,
+  spits lines of acid and cones of spines, then burrows: a dirt mound digs toward you and
+  it bursts out under the orange marker, so keep moving.
 
 ## Status
 
-Playable prototype: two decks, five enemy types, two bosses, six weapons, generated music
+Playable prototype: three decks, five enemy types, three bosses, six weapons, generated music
 and sound. `CLAUDE.md` has the design decisions, asset formats, code layout, tuning notes
 and next steps.
 
@@ -65,8 +67,8 @@ pip3 install -r tools/artgen/requirements.txt
 python3 tools/artgen/build.py
 ```
 
-The Reactor map is laid out by `tools/maps/reactor.py`, which writes it into
-`internal/world/maps.go`.
+The Reactor and Hydroponics maps are laid out by `tools/maps/reactor.py` and
+`tools/maps/hydroponics.py`, which write them into `internal/world/maps.go`.
 
 ## Development
 

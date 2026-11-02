@@ -1,6 +1,7 @@
 package game
 
 import (
+	"image"
 	"image/color"
 	"math"
 	"sort"
@@ -16,6 +17,8 @@ var (
 	voidColor = color.RGBA{18, 20, 28, 255}
 	globMark  = color.RGBA{120, 220, 60, 255}
 	shellMark = color.RGBA{238, 90, 40, 255}
+	dirtColor = color.RGBA{58, 42, 30, 255}
+	dirtLight = color.RGBA{118, 90, 60, 255}
 )
 
 // renderLevel pre-draws floors, walls and decals into one big image.
@@ -156,7 +159,7 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 }
 
 var enemyAnim = map[enemyKind]string{crawler: "crawler", spitter: "spitter", drone: "drone",
-	bomber: "bomber", brute: "brute", brood: "brood", warden: "warden"}
+	bomber: "bomber", brute: "brute", brood: "brood", warden: "warden", maw: "maw"}
 
 func (g *Game) drawEnemy(dst *ebiten.Image, e *Enemy, cam geom.Vec) {
 	// side-on enemies only have *_right frames, mirrored for left
@@ -187,7 +190,37 @@ func (g *Game) drawEnemy(dst *ebiten.Image, e *Enemy, cam geom.Vec) {
 	if e.Flash > 0 {
 		o.Flash = 0.85
 	}
+	if e.hidden() {
+		g.drawBurrow(dst, e, img, cam)
+		return
+	}
 	gfx.DrawAtFeet(dst, img, e.Pos.X-cam.X, e.Pos.Y-cam.Y, o)
+}
+
+// drawBurrow draws the Maw underground: a dirt mound that moves with it, the
+// spot where it will burst out, and the sprite cut off at the floor while it
+// sinks or rises.
+func (g *Game) drawBurrow(dst *ebiten.Image, e *Enemy, img *ebiten.Image, cam geom.Vec) {
+	up, warn, _ := e.mawPhase()
+	at := e.Pos.Sub(cam)
+	wobble := math.Sin(g.t*40) * 1.5
+	fillEllipse(dst, at, 12+wobble, 4.5, voidColor, 0.8)
+	fillEllipse(dst, at.Sub(geom.V(0, 1)), 10-wobble, 3.5, dirtColor, 1)
+	fillEllipse(dst, at.Sub(geom.V(1, 2.5)), 6+wobble, 2, dirtLight, 1) // churned up on top
+	if warn {
+		r := mawBurst - 6 // where it hurts the player
+		fillEllipse(dst, at, r, r*0.55, shellMark, 0.4+0.12*math.Sin(g.t*30))
+	}
+	if up <= 0 {
+		return
+	}
+	b := img.Bounds()
+	vis := int(up * float64(b.Dy()-3))
+	if vis <= 0 {
+		return
+	}
+	top := img.SubImage(image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+vis)).(*ebiten.Image)
+	gfx.DrawAtFeet(dst, top, at.X, at.Y-3, gfx.SpriteOpts{})
 }
 
 func (g *Game) drawPlayer(dst *ebiten.Image, cam geom.Vec) {

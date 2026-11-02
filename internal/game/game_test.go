@@ -17,12 +17,12 @@ func TestAutopilotRound(t *testing.T) {
 	}
 	g.autopilot = newAutopilot()
 	start := g.aliveFoes()
-	for i := 0; i < 60*400 && g.state == statePlaying; i++ { // waves and boss: allow ~7 minutes
+	for i := 0; i < 60*720 && g.state == statePlaying; i++ { // every deck in a row: allow ~12 minutes
 		if err := g.Update(); err != nil {
 			t.Fatal(err)
 		}
 	}
-	t.Logf("after %.1fs: state=%d wave=%d killed=%d hp=%d", g.t, g.state, g.wave, g.kills, g.player.HP)
+	t.Logf("after %.1fs on deck %d: state=%d wave=%d killed=%d hp=%d", g.t, g.level+1, g.state, g.wave, g.kills, g.player.HP)
 	if g.kills < start/2 {
 		t.Errorf("autopilot only killed %d enemies", g.kills)
 	}

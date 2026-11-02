@@ -4,9 +4,10 @@ Top-down sci-fi shooter: a lone marine clears an infested space station.
 WASD to move, mouse to aim (full 360°), click to shoot.
 Go + **Ebitengine v2** (`github.com/hajimehoshi/ebiten/v2`), pixel art at 24×24 per tile/frame.
 
-**Status:** playable prototype. Two station decks (Habitat, Reactor), each played as 4 waves
-and a boss, the marine with 360° aiming and six weapons (three unlocked by clearing waves),
-crawlers / spitters / drones / bombers / brutes, two bosses (the Brood Mother, the Warden),
+**Status:** playable prototype. Three station decks (Habitat, Reactor, Hydroponics), each
+played as 4 waves and a boss, the marine with 360° aiming and six weapons (three unlocked by clearing waves),
+crawlers / spitters / drones / bombers / brutes, three bosses (the Brood Mother, the Warden,
+the Maw),
 magazines and reloading,
 health and ammo pickups, sliding doors, explosive barrels, HUD, sounds, music, win/lose and restart. See "Prototype: what exists" and "Next steps" at the end.
 
@@ -39,7 +40,8 @@ assets/sprites/   player.png, enemies.png, fx.png (one animation per row, 24×24
 assets/sounds/    <name>_<variant>.wav, 16-bit mono 44.1 kHz (the game picks a random variant)
 assets/music/     music_<name>.wav loops, 16-bit mono 22.05 kHz
 tools/artgen/     make_tiles.py, make_sprites.py, make_sfx.py, make_music.py, make_preview.py, build.py
-tools/maps/       reactor.py: lays out the Reactor map by coordinates and writes it into maps.go
+tools/maps/       reactor.py, hydroponics.py: lay out those maps by coordinates and write them
+                  into maps.go
 docs/previews/    enlarged sheets + scene.gif / animations.gif / aiming.png for viewing only
 ```
 
@@ -52,7 +54,7 @@ internal/geom           Vec (2D math)
 internal/gfx            sprites.json/tiles.json parsing, Library (anims, tiles, weapons, font),
                         draw helpers, Font (bitmap text)
 internal/world          map text format, autotile, doors, collision (MoveAndSlide), line of sight,
-                        BFS flow field for enemy pathing; maps.go holds the Station and Reactor maps
+                        BFS flow field for enemy pathing; maps.go holds the Station, Reactor and Hydroponics maps
 internal/game           Game loop, input, player, enemies (AI + stats table), combat
                         (bullets, enemy shots, blasts), waves.go (waves, boss, doors),
                         drawing (y-sorted), HUD, sound (sfx.go), devtools
@@ -86,7 +88,8 @@ fight simulation; port its logic rather than reinventing it.
 
 ### Tiles (`assets/tiles/tiles.json`)
 - Index `i` sits at column `i % 8`, row `i / 8`, 24×24 each. Names are in `tiles`.
-- Floors: `floor_plate_a/b/dirty`, `floor_grate`, `floor_hazard`, `floor_vent`, `floor_lightstrip`.
+- Floors: `floor_plate_a/b/dirty`, `floor_grate`, `floor_hazard`, `floor_vent`, `floor_lightstrip`,
+  `floor_soil` (a grow bed, map letter `o`; appended last so older indexes stay put).
 - Wall faces: `wall_face`, `wall_face_light`, `wall_face_pipe`, `wall_face_warning`.
 - Doors (wall-face tiles, also a 3-frame slide animation): `door_closed`, `door_half`, `door_open`.
 - Props, drawn over a floor tile, with their own drop shadow: `crate`, `console`, `barrel_toxic`,
@@ -112,7 +115,9 @@ fight simulation; port its logic rather than reinventing it.
   (stationary, lobs acid; the glob should leave on attack frame 2), `drone.idle/attack/death`
   (hovering, shoots a laser; it fires on attack frame 2), `bomber.walk_right/attack_right/death`
   (attack = swelling before it bursts), `brute.walk_right/attack_right/death` (attack frames
-  0-1 wind-up, 2-3 charge), `brood.idle/attack/death` and `warden.idle/attack/death` (48×48, in bosses.png).
+  0-1 wind-up, 2-3 charge), `brood.idle/attack/death`, `warden.idle/attack/death` and
+  `maw.idle/attack/death` (48×48, in bosses.png; the Maw stands in its hole at the bottom of
+  the frame, and the game sinks and raises it by cropping the frame at the feet).
 - FX: `bullet`, `laser`, `plasma`, `grenade`, `spine` (all point right: rotate to the heading),
   `hit_spark`, `acid_glob`, `acid_splash`, `explosion`, `muzzle_flash`, `crosshair`.
 - Font (`font.png`, metadata under `"font.png"`): 5×7 uppercase glyphs (`GLYPHS` in
@@ -185,8 +190,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   collect; one you can't use stays on the floor. They vanish after 25 s, blinking for the
   last 4.
 - **Decks** (`levels` in `internal/game/waves.go`): each has a name, a map, its wave list,
-  its boss (map letter `M` Brood Mother, `W` Warden) and how many weapons it starts with
-  (3, then 6). Beating a deck's boss starts the next deck after 2.5 s with full HP and ammo;
+  its boss (map letter `M` Brood Mother, `W` Warden, `O` the Maw) and how many weapons it
+  starts with (3, then 6, 6). Beating a deck's boss starts the next deck after 2.5 s with full HP and ammo;
   dying (or R in the pause menu) retries the current deck from its start; after the last
   deck the station is clear and R / click starts again from deck 1.
 - **Waves**: wave 1 is the enemies placed in the map; then each string in the deck's
@@ -212,7 +217,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   `hurt` / `player_death`, `<kind>_death` per enemy (`deathSound` in `enemy.go`), `explosion`
   (barrels, bombers, grenades), `door`, `boss_roar`, `pickup`, `reload`, `dry_fire`, and
   enemy attacks: `laser` (drone fires),
-  `spit` and `acid_splash` (spitter glob), `spine` (boss ring).
+  `spit` and `acid_splash` (spitter glob), `spine` (boss ring), `burrow` (the Maw appears or
+  digs in).
   `hurt` and `player_death` are a voice made by source-filter synthesis (`voice()` in make_sfx.py). `BZ_MUTE=1`
   or running under `go test` skips audio entirely (no audio context is created).
 - **Music** (`sfx.go`, `musicTrack`/`updateMusic`): three loops, `calm` (exploring, between
@@ -239,7 +245,12 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   crawls after the player and cycles a ring of slow spines, an acid barrage and summoning
   crawlers. The Warden (80 HP, 2.4 s between attacks) hovers 60–100 px away and cycles a
   slow fan of 3 lasers, mortar shells (an orange ground marker shows the blast; they hurt
-  enemies too) and deploying drones. Crates block bullets, lasers and spines in both
+  enemies too) and deploying drones. The Maw (100 HP, `updateMaw`) never walks: above
+  ground it alternates a line of acid globs that land one after another and a cone of
+  spines, and between them it burrows (state `stUnder`, `hidden()`: no hits, no contact):
+  it sinks, digs toward the player as a dirt mound, waits 0.7 s under an orange marker,
+  then bursts out (`blast` plus a ring of spines; crawlers too when enraged). Out of the
+  player's sight it always burrows. Timings are the `maw*` constants. Crates block bullets, lasers and spines in both
   directions (cover).
 - **Explosive barrels** take 3 hits, damage everything within ~44 px and chain to nearby barrels
   (`blast` in combat.go, shared with bombers and grenades).
@@ -247,6 +258,7 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   (`BZ_AUTOPILOT=human` gives it shaky aim and 0.35 s reactions, a rough stand-in for a person);
   `BZ_RECORD=dir BZ_RECORD_SECONDS=30` saves every 3rd frame as PNG and then quits;
   `BZ_DECK=2` starts on that deck (also handy to practise a boss).
+  The bot steps off the Maw's marker after its reaction time.
   `docs/previews/gameplay.gif` was made that way: clips of the deck 1 opening, the bot
   using the weapon wheel, a wave coming in, the Brood Mother and the Warden, picked from
   two recorded bot runs.
@@ -254,7 +266,7 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   golden data, collision, line of sight, flow-field following, metadata completeness,
   facing sectors, doors, the wave → boss → clear flow, reloading, pickups, music choice, and full rounds
   played by the autopilot
-  (clear, death, restart, barrel chains), and walking through every wave of both decks.
+  (clear, death, restart, barrel chains), and walking through every wave of every deck.
   `TestDifficulty` plays 20 seeded games of each deck (all waves and the boss) with the
   handicapped bot and fails if it beats the boss in under half of them or keeps over 75% HP
   on average; run it with `-v` while tuning. `TestAutopilotDoesNotGetStuck` fails if the bot
@@ -271,7 +283,9 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   games (~4.6/8 HP left) and deck 2 in 10/20 (~4.0/8), in ~150 s each; most deaths were to
   the bosses. Those numbers were partly the bot getting stuck (~4% of its time): once it
   stopped (below) it beats deck 1 in 18/20 and deck 2 in 13/20 with ~5/8 HP left (with
-  the weapon wheel use below). The
+  the weapon wheel use below). Deck 3 (Hydroponics, the Maw) was tuned to 12/20 with
+  ~2.3/8 HP left, the hardest deck on purpose; the Maw's spines did most of the damage, so
+  their counts (ring 8/12, cone 5/7) and its 2.2 s cooldown are its levers. The
   game itself wasn't retuned after that; if it now feels easy to a person, raise difficulty
   and the guard-rail together. Reload time was the biggest lever (1.2 s rifle reloads dropped deck 1 to
   2/20); for the Warden it was its attack rate (2.0 s → 3/20, 2.4 s → 10/20). Explosive
@@ -292,7 +306,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   plus a deck field choosing them.
 - More decks: a map in `maps.go` (keep `TestMapsAreConnected` passing) plus an entry in
   `levels`; a new boss is a kind, a stats entry, an attack function and a bosses.png row.
-  The Reactor map is laid out by `tools/maps/reactor.py` (rooms, openings and props as
-  coordinates; `--print` shows it with column numbers) rather than typed by hand, which
+  The Reactor and Hydroponics maps are laid out by `tools/maps/reactor.py` and
+  `tools/maps/hydroponics.py` (rooms, openings and props as coordinates; `--print` shows
+  them with column numbers; copy one for a new deck) rather than typed by hand, which
   avoids off-by-one columns; edit the script, not the strings in maps.go.
 - Possible later mode: turn-based tactics reusing the same tiles and sprites.

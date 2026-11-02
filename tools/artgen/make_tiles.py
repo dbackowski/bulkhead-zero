@@ -166,6 +166,22 @@ def floor_lightstrip():
     return img
 
 
+def floor_soil():
+    """Hydroponic grow bed: a metal rim around dark soil with sprouts."""
+    rng = random.Random(31)
+    img = new()
+    bevel(img, 0, 0, T - 1, T - 1, "d2", "m1", "d1")
+    rect(img, 2, 2, T - 3, T - 3, (44, 32, 24))
+    hline(img, 2, T - 3, 2, (28, 20, 16))                       # inner shadow under the rim
+    noise(img, rng, [(62, 46, 32), (34, 24, 18), (74, 56, 38)], 60, 2, 3, T - 3, T - 3)
+    for x, y in ((5, 8), (11, 6), (17, 9), (7, 16), (14, 15), (19, 18)):
+        px(img, x, y, "green_d")
+        px(img, x, y - 1, "green")
+        px(img, x - 1, y - 2, "green")
+        px(img, x + 1, y - 2, "green_d")
+    return img
+
+
 # ---- walls (3/4 top-down: "top" is the roof cap, "face" is the visible front)
 def wall_top():
     img = new()
@@ -468,6 +484,7 @@ def build_tiles():
         tiles.append((f"wall_cap_{m:02d}", wall_cap(m)))
     for c in ("NE", "NW", "SE", "SW"):
         tiles.append((f"wall_inner_{c}", wall_inner_corner(c)))
+    tiles.append(("floor_soil", floor_soil()))  # appended: earlier indexes stay put
     return tiles
 
 
@@ -475,7 +492,7 @@ WALL_CHARS = set("#LP!D=")
 FACE_VARIANT = {"#": "wall_face", "L": "wall_face_light", "P": "wall_face_pipe",
                 "!": "wall_face_warning", "D": "door_closed", "=": "door_open"}
 FLOOR_CHARS = {"g": "floor_grate", "h": "floor_hazard", "v": "floor_vent",
-               "s": "floor_lightstrip"}
+               "s": "floor_lightstrip", "o": "floor_soil"}
 PROP_CHARS = {"b": "barrel_toxic", "B": "barrel_explosive", "c": "console", "x": "crate",
               "k": "locker", "t": "terminal"}
 DECAL_CHARS = {"a": "decal_acid", "z": "decal_scorch", "~": "decal_cables"}
