@@ -76,7 +76,7 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		return in
 	}
 	var vis, near, dig *Enemy
-	var dv, dn float64
+	var dv, dn, score float64
 	for _, e := range g.enemies {
 		if _, warn, wt := e.mawPhase(); warn && wt > a.reaction && e.Pos.Dist(p.Pos) < mawBurst {
 			dig = e // about to burst out right here
@@ -88,8 +88,12 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		if near == nil || d < dn {
 			near, dn = e, d
 		}
-		if d < 250 && g.lvl.LineOfSight(p.Pos.Sub(geom.V(0, 8)), e.eye()) && (vis == nil || d < dv) {
-			vis, dv = e, d
+		s := d // rather shoot something whose shield isn't in the way
+		if e.blocks(e.Pos.Sub(p.Pos)) {
+			s += 150
+		}
+		if d < 250 && g.lvl.LineOfSight(p.Pos.Sub(geom.V(0, 8)), e.eye()) && (vis == nil || s < score) {
+			vis, dv, score = e, d, s
 		}
 	}
 
@@ -118,7 +122,7 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	rifle, smg, plasma, pistol := g.slotOf("rifle"), g.slotOf("smg"), g.slotOf("plasma"), g.slotOf("pistol")
 	slot := rifle
 	switch {
-	case vis != nil && dv < 70 && vis.Kind == crawler:
+	case vis != nil && dv < 70 && vis.Kind == crawler && g.slotOf("shotgun") < g.unlocked:
 		slot = g.slotOf("shotgun")
 	case math.Mod(a.t, 24) > 20:
 		slot = pistol
@@ -128,6 +132,9 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	}
 	if slot == smg && plasma < g.unlocked && vis != nil && vis.Kind == warden {
 		slot = plasma // accurate at the range the Warden keeps
+	}
+	if h := p.Heavy; h >= 0 && vis != nil && (!g.weapons[h].Flame || dv < 80) {
+		slot = h // a heavy weapon for whatever is in sight (fire only up close)
 	}
 	if p.ReloadT > 0 {
 		slot = p.Slot // switching would throw the reload away
@@ -139,7 +146,7 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	case a.wheelTo >= 0: // mid-pick: hold Q and sweep toward the gun, then let go
 		a.wheelT += tick
 		in.WheelHeld = a.wheelT < botWheelHold
-		dir := wheelSlotPos(a.wheelTo, len(g.weapons)).Sub(geom.V(ScreenW/2, ScreenH/2)).Norm()
+		dir := wheelSlotPos(min(a.wheelTo, g.guns), g.wheelSpots()).Sub(geom.V(ScreenW/2, ScreenH/2)).Norm()
 		in.Mouse = a.wheelOrigin.Add(dir.Scale(40 * math.Min(a.wheelT/(botWheelHold*0.7), 1)))
 		if !in.WheelHeld {
 			a.wheelTo = -1
@@ -150,7 +157,8 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	case slot != p.Slot:
 		in.SelectSlot = slot
 	}
-	if vis != nil {
+	guarded := vis != nil && vis.blocks(vis.Pos.Sub(p.Pos)) // its shield faces us: circle it
+	if vis != nil && !guarded {
 		onTarget := math.Abs(angleDiff(target.Sub(g.handPos().Sub(g.cam)).Angle(), p.Aim)) < 0.3 && a.seen >= a.reaction
 		in.Fire = onTarget
 		in.FirePressed = onTarget && int(a.t*60)%14 == 0
@@ -161,7 +169,7 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	// the nearest pickup it has a use for
 	var pick *Pickup
 	for _, pk := range g.pickups {
-		if g.wants(pk) && pk.T < pickupLife-3 && (pick == nil || pk.Pos.Dist(p.Pos) < pick.Pos.Dist(p.Pos)) {
+		if g.wants(pk) && (pk.Kind == pickWeapon || pk.T < pickupLife-3) && (pick == nil || pk.Pos.Dist(p.Pos) < pick.Pos.Dist(p.Pos)) {
 			pick = pk
 		}
 	}
@@ -183,7 +191,7 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	// movement: back off from close melee enemies, strafe while shooting at
 	// mid range, walk the path toward far targets, otherwise grab pickups,
 	// otherwise hunt. Sideways moves switch sides when that side is blocked.
-	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, brood: 60, maw: 50}
+	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, brood: 60, maw: 50, splitter: 45, shielder: 45}
 	var to, side geom.Vec
 	if vis != nil {
 		to = vis.Pos.Sub(p.Pos).Norm()
@@ -204,6 +212,8 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	case a.detourT > 0:
 		a.detourT -= dt
 		in.Move = a.detour
+	case guarded && dv < 90 && side != (geom.Vec{}):
+		in.Move = side.Add(to.Scale((dv - 60) / 60))
 	case vis != nil && dv < backOff[vis.Kind]:
 		in.Move = to.Scale(-1).Add(side.Scale(0.6))
 		if !free(in.Move, 6) {

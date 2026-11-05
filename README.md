@@ -28,18 +28,27 @@ go run .
 
 ## How it plays
 
-- **Three decks.** The Habitat, the Reactor, then Hydroponics. Each is four waves and a boss: first clear
+- **Three decks.** The Habitat, the Reactor, then Hydroponics. Each is five waves and a boss: first clear
   the enemies already on the deck, then the next waves come in through the outer doors.
   Beating the boss takes you to the next deck; dying restarts the deck you're on.
-- **Six guns.** You start with the pistol, rifle and shotgun; clearing waves unlocks the
-  smg, the plasma rifle (its bolts pass through several enemies) and the grenade launcher
-  (mind the blast). Every gun has a magazine and limited spare ammo, except the pistol.
-- **Pickups.** Enemies sometimes drop medkits and ammo boxes. You also get some health back
+- **Six guns.** You start with the pistol and rifle. The shotgun, smg, plasma rifle (its
+  bolts pass through several enemies) and grenade launcher (mind the blast) have to be found:
+  clearing a deck's second wave and beating each boss drops one, and brutes sometimes do.
+  Walk over a gun to pick it up; the guns you find come with you to the next deck. Every gun has a magazine and limited spare ammo, except the pistol.
+- **Heavy weapons.** A minigun (spins up, shreds everything, slows you down while firing)
+  and a flamethrower (a short jet of fire through everything in its path). One drops after
+  each deck's fourth wave, and tough enemies rarely drop one. You carry one at a time on 7,
+  it can't be reloaded or refilled, and when it's empty you drop it and go back to your gun.
+- **Pickups.** Enemies and broken crates sometimes drop medkits and ammo boxes. You also get some health back
   after each wave, and full health before a boss.
 - **Enemies.** Crawlers rush you, spitters lob acid (watch the green marker where it will
   land), drones hover and shoot lasers, bombers run up and burst (shoot them early, ideally
-  next to their friends), and brutes wind up and charge. Doors slide open for whoever walks
-  up to them; red barrels explode.
+  next to their friends), and brutes wind up and charge. Splitters burst into three small
+  crawlers when they die, shield-bearers block bullets from the front (get around them, or
+  use explosives) and bash you up close, and nests in Hydroponics keep birthing crawlers
+  until you destroy them. Doors slide open for whoever walks
+  up to them; red barrels explode; crates are cover until they're shot apart, and often
+  have a pickup inside.
 - **Bosses.** The Brood Mother sprays rings of spines, lobs acid and summons her brood. The
   Warden, a security mech, keeps its distance, fires laser fans and mortar shells (orange
   markers show where they hit) and launches drones. The Maw, a giant worm in the grow beds,
@@ -48,7 +57,7 @@ go run .
 
 ## Status
 
-Playable prototype: three decks, five enemy types, three bosses, six weapons, generated music
+Playable prototype: three decks, eight enemy types, three bosses, six guns and two heavy weapons, generated music
 and sound. `CLAUDE.md` has the design decisions, asset formats, code layout, tuning notes
 and next steps.
 

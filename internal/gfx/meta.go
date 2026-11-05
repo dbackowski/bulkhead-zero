@@ -35,7 +35,12 @@ type WeaponMeta struct {
 	Projectile  string  `json:"projectile"` // fx animation, default "bullet"
 	Mag         int     `json:"mag"`        // rounds per magazine
 	ReloadMS    int     `json:"reload_ms"`
-	Ammo        int     `json:"ammo"` // most spare rounds carried; 0 = unlimited
+	Ammo        int     `json:"ammo"`     // most spare rounds carried; 0 = unlimited
+	Heavy       bool    `json:"heavy"`    // no reloads: mag is all its ammo, thrown away when empty
+	SpinMS      int     `json:"spin_ms"`  // trigger time before it starts firing (minigun)
+	MoveMul     float64 `json:"move_mul"` // movement speed while firing (0 = unchanged)
+	LifeMS      int     `json:"life_ms"`  // how long a shot flies (0 = the default)
+	Flame       bool    `json:"flame"`    // fire: no sparks, not stopped by shields, slows as it goes
 }
 
 // FontMeta describes font.png: one row of outlined glyph cells in Chars order.

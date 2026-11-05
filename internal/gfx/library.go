@@ -73,6 +73,11 @@ type Weapon struct {
 	Mag         int
 	ReloadMS    float64
 	Ammo        int // most spare rounds; 0 = unlimited
+	Heavy       bool
+	SpinMS      float64
+	MoveMul     float64
+	LifeMS      float64
+	Flame       bool
 }
 
 // Library holds every loaded image and animation.
@@ -201,6 +206,11 @@ func Load(fsys fs.FS) (*Library, error) {
 			Mag:         max(w.Mag, 1),
 			ReloadMS:    float64(w.ReloadMS),
 			Ammo:        w.Ammo,
+			Heavy:       w.Heavy,
+			SpinMS:      float64(w.SpinMS),
+			MoveMul:     w.MoveMul,
+			LifeMS:      float64(w.LifeMS),
+			Flame:       w.Flame,
 		}
 	}
 	for f, a := range sm.Player.HandAnchor {

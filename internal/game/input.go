@@ -47,6 +47,9 @@ func readInput(g *Game) Input {
 			in.SelectSlot = i
 		}
 	}
+	if inpututil.IsKeyJustPressed(ebiten.Key7) {
+		in.SelectSlot = g.player.Heavy // -1 when there is none
+	}
 	in.WheelHeld = ebiten.IsKeyPressed(ebiten.KeyQ)
 	if _, wy := ebiten.Wheel(); wy > 0 {
 		in.Cycle = -1

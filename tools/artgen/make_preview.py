@@ -369,7 +369,7 @@ def showcase():
     cells = []
     for name, frames in A["player"].items():
         cells.append((name, frames, ms.timing_for(name)))
-    for group in ("crawler", "spitter", "drone", "bomber", "brute", "boss", "warden"):
+    for group in ("crawler", "spitter", "drone", "bomber", "brute", "splitter", "shielder", "nest", "boss", "warden"):
         for name, frames in A[group].items():
             cells.append((f"{group} {name.replace('_right', '')}", frames, ms.timing_for(name)))
     for name, frames in A["fx"].items():

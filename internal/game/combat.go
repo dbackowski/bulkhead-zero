@@ -19,9 +19,11 @@ type Bullet struct {
 	Life   float64
 	Dmg    int
 	Rot    float64
-	Anim   string   // fx animation
-	Pierce int      // enemies it may pass through
-	Blast  float64  // explodes with this radius instead of hitting
+	Anim   string  // fx animation
+	Pierce int     // enemies it may pass through
+	Blast  float64 // explodes with this radius instead of hitting
+	Flame  bool    // flamethrower fire: no sparks, not stopped by shields, slows down
+	Age    float64
 	hit    []*Enemy // already pierced
 }
 
@@ -78,6 +80,10 @@ func (g *Game) updateBullets() {
 // stepBullet advances one bullet and reports whether it is still flying.
 func (g *Game) stepBullet(b *Bullet) bool {
 	b.Life -= dt
+	b.Age += dt
+	if b.Flame {
+		b.Vel = b.Vel.Scale(1 - 1.8*dt)
+	}
 	if b.Life <= 0 {
 		if b.Blast > 0 {
 			g.blast(b.Ground, b.Blast, b.Dmg)
@@ -97,11 +103,19 @@ func (g *Game) stepBullet(b *Bullet) bool {
 					g.blast(b.Ground, b.Blast, b.Dmg)
 					return false
 				}
-				g.damageEnemy(e, b.Dmg, b.Ground.Sub(b.Vel))
-				g.spawnFX("fx.hit_spark", visual, 0)
-				if e.Kind == drone {
+				if e.blocks(b.Vel) && !b.Flame {
+					g.spawnFX("fx.hit_spark", visual, 0)
 					g.sound("hit_metal", b.Ground)
-				} else {
+					return false
+				}
+				g.damageEnemy(e, b.Dmg, b.Ground.Sub(b.Vel))
+				switch {
+				case b.Flame:
+				case e.Kind == drone:
+					g.spawnFX("fx.hit_spark", visual, 0)
+					g.sound("hit_metal", b.Ground)
+				default:
+					g.spawnFX("fx.hit_spark", visual, 0)
 					g.sound("hit_flesh", b.Ground)
 				}
 				if len(b.hit) >= b.Pierce {
@@ -114,17 +128,20 @@ func (g *Game) stepBullet(b *Bullet) bool {
 			g.blast(b.Ground.Sub(step), b.Blast, b.Dmg) // just short of what it hit
 			return false
 		}
+		if b.Flame && (g.lvl.WallAt(b.Ground) || g.lvl.PropAt(b.Ground) != nil) {
+			if pr := g.lvl.PropAt(b.Ground); pr != nil {
+				g.damageProp(pr, b.Dmg) // crates burn, barrels go off
+			}
+			return false
+		}
 		if pr := g.lvl.PropAt(b.Ground); pr != nil {
 			hit := "hit_wall"
 			if pr.Explosive {
 				hit = "hit_metal"
-				pr.HP -= b.Dmg
-				if pr.HP <= 0 {
-					g.explode(pr)
-				}
 			}
 			g.spawnFX("fx.hit_spark", visual, 0)
 			g.sound(hit, b.Ground)
+			g.damageProp(pr, b.Dmg)
 			return false
 		}
 		if g.lvl.WallAt(b.Ground) {
@@ -184,6 +201,31 @@ func (g *Game) updateShots() {
 	g.shots = keep
 }
 
+// crateDrop is the chance a broken crate leaves a pickup.
+const crateDrop = 0.5
+
+// damageProp wears down a barrel or crate: at 0 HP barrels explode and
+// crates break. Props without HP shrug it off.
+func (g *Game) damageProp(pr *world.Prop, dmg int) {
+	if !pr.Alive || pr.HP <= 0 {
+		return
+	}
+	if pr.HP -= dmg; pr.HP > 0 {
+		return
+	}
+	if pr.Explosive {
+		g.explode(pr)
+		return
+	}
+	g.lvl.RemoveProp(pr)
+	g.wrecks = append(g.wrecks, geom.V(float64(pr.TX*world.T), float64(pr.TY*world.T)))
+	g.spawnFX("fx.debris", pr.Center(), 0)
+	g.sound("crate_break", pr.Center())
+	if g.rng.Float64() < crateDrop {
+		g.dropAt(pr.Feet())
+	}
+}
+
 // explode blows up an explosive barrel.
 func (g *Game) explode(pr *world.Prop) {
 	if !pr.Alive {
@@ -195,7 +237,7 @@ func (g *Game) explode(pr *world.Prop) {
 
 // blast is an explosion on the ground at c (barrels, bombers, grenades): it
 // deals dmg to enemies within r, 2 to the player a little closer in, leaves a
-// scorch mark and sets off barrels nearby.
+// scorch mark, sets off barrels nearby and smashes crates.
 func (g *Game) blast(c geom.Vec, r float64, dmg int) {
 	v := c.Sub(geom.V(0, 9))
 	g.spawnFX("fx.explosion", v, 0)
@@ -212,8 +254,12 @@ func (g *Game) blast(c geom.Vec, r float64, dmg int) {
 		g.hurtPlayer(2, c)
 	}
 	for _, o := range g.lvl.Props {
-		if o.Alive && o.Explosive && o.Feet().Dist(c) < r+4 {
+		switch {
+		case !o.Alive || o.Feet().Dist(c) >= r+4:
+		case o.Explosive:
 			g.blasts = append(g.blasts, pendingBlast{prop: o, in: 0.15})
+		default:
+			g.damageProp(o, dmg)
 		}
 	}
 }

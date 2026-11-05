@@ -44,7 +44,8 @@ type Game struct {
 	static  *ebiten.Image // pre-rendered floors, walls, decals
 	canvas  *ebiten.Image
 	rng     *rand.Rand
-	weapons []*gfx.Weapon
+	weapons []*gfx.Weapon // the guns in weaponOrder, then the heavies in heavyOrder
+	guns    int           // how many of weapons are guns (slots below this)
 
 	player     *Player
 	enemies    []*Enemy
@@ -53,6 +54,7 @@ type Game struct {
 	fx         []*FX
 	pickups    []*Pickup
 	scorches   []geom.Vec
+	wrecks     []geom.Vec // broken crates (tile corners)
 	blasts     []pendingBlast
 	flow       []int
 	flowTimer  float64
@@ -72,6 +74,8 @@ type Game struct {
 	fightT     float64 // > 0 while the combat music should play
 	boss       *Enemy
 	unlocked   int // weapons available (slots 0..unlocked-1)
+	carried    int // weapons held when the current deck started (a retry starts with these)
+	lastKill   geom.Vec
 	banner     string
 	bannerT    float64
 	autopilot  *autopilot
@@ -88,12 +92,13 @@ func New() (*Game, error) {
 		return nil, err
 	}
 	g := &Game{lib: lib, rng: rand.New(rand.NewSource(rand.Int63()))}
-	for _, name := range weaponOrder {
-		w, ok := lib.Weapons[name]
-		if !ok {
-			continue
+	for i, name := range append(weaponOrder, heavyOrder...) {
+		if i == len(weaponOrder) {
+			g.guns = len(g.weapons)
 		}
-		g.weapons = append(g.weapons, w)
+		if w, ok := lib.Weapons[name]; ok {
+			g.weapons = append(g.weapons, w)
+		}
 	}
 	g.canvas = ebiten.NewImage(ScreenW, ScreenH)
 	switch os.Getenv("BZ_AUTOPILOT") {
@@ -132,14 +137,16 @@ func (g *Game) reset() error {
 	g.static = renderLevel(g.lib, lvl)
 	g.player = newPlayer(lvl.Start, g.weapons)
 	g.player.Slot = max(g.slotOf(startWeapon), 0)
+	g.player.LastGun = g.player.Slot
 	g.enemies = g.enemies[:0]
 	for _, s := range lvl.Spawns {
 		g.enemies = append(g.enemies, newEnemy(s, g.rng))
 	}
 	g.totalFoes, g.kills = len(g.enemies), 0
 	g.wave, g.queue, g.nextIn, g.boss, g.banner, g.bannerT, g.fightT = 1, nil, 0, nil, "", 0, 0
-	g.unlocked = min(g.deck().unlocked, len(g.weapons))
-	g.bullets, g.shots, g.fx, g.scorches, g.blasts, g.pickups = nil, nil, nil, nil, nil, nil
+	g.unlocked = min(max(g.carried, g.deck().unlocked), g.guns)
+	g.carried = g.unlocked
+	g.bullets, g.shots, g.fx, g.scorches, g.wrecks, g.blasts, g.pickups = nil, nil, nil, nil, nil, nil, nil
 	g.state, g.stateT, g.t = statePlaying, 0, 0
 	g.say(g.deck().name, 3)
 	g.wheel = weaponWheel{}
@@ -174,7 +181,7 @@ func (g *Game) step(in Input) error {
 	}
 	if in.Restart {
 		if g.state == stateClear {
-			g.level = 0 // won: play from the start; died or paused: retry this deck
+			g.level, g.carried = 0, 0 // won: play from the start; died or paused: retry this deck
 		}
 		return g.reset()
 	}

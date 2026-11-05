@@ -12,7 +12,7 @@ import (
 )
 
 // The weapon wheel: hold Q and every gun appears in a ring (pistol at the top,
-// then clockwise in key order). Moving the mouse away from where it was when
+// then clockwise in key order, the heavy weapon last). Moving the mouse away from where it was when
 // the wheel opened highlights the gun in that direction; releasing Q switches
 // to it. A quick tap of Q without moving still cycles to the next gun. Time
 // runs slowly while the wheel is open, the aim holds still and nothing fires.
@@ -38,6 +38,17 @@ func wheelSlotAt(angle float64, n int) int {
 	return ((i % n) + n) % n
 }
 
+// wheelSpots is how many places the ring has: one per gun and one for the heavy.
+func (g *Game) wheelSpots() int { return g.guns + 1 }
+
+// wheelSlot is the weapon slot at ring place i (-1 for an empty heavy place).
+func (g *Game) wheelSlot(i int) int {
+	if i < g.guns {
+		return i
+	}
+	return g.player.Heavy
+}
+
 func wheelSlotPos(i, n int) geom.Vec {
 	a := -math.Pi/2 + float64(i)*2*math.Pi/float64(n)
 	return geom.V(ScreenW/2, ScreenH/2).Add(geom.FromAngle(a).Scale(wheelRadius))
@@ -57,13 +68,13 @@ func (g *Game) updateWheel(in Input) Input {
 	case in.WheelHeld:
 		w.heldT += tick
 		if v := in.Mouse.Sub(w.origin); v.Len() > wheelDeadzone {
-			w.hover = wheelSlotAt(v.Angle(), len(g.weapons))
+			w.hover = wheelSlotAt(v.Angle(), g.wheelSpots())
 		}
 	case w.open: // Q released
 		w.open = false
 		switch {
-		case w.hover >= 0 && w.hover < g.unlocked:
-			in.SelectSlot = w.hover
+		case w.hover >= 0 && g.holds(g.wheelSlot(w.hover)):
+			in.SelectSlot = g.wheelSlot(w.hover)
 		case w.hover < 0 && w.heldT < wheelTap:
 			in.Cycle = 1
 		}
@@ -81,25 +92,28 @@ func (g *Game) drawWheel(dst *ebiten.Image) {
 	}
 	f, p := g.lib.Font, g.player
 	vector.FillRect(dst, 0, 0, ScreenW, ScreenH, color.RGBA{0, 0, 0, 90}, false)
-	for i, wp := range g.weapons {
-		c := wheelSlotPos(i, len(g.weapons))
-		locked := i >= g.unlocked
+	for i := 0; i < g.wheelSpots(); i++ {
+		slot := g.wheelSlot(i)
+		c := wheelSlotPos(i, g.wheelSpots())
+		locked := !g.holds(slot)
 		vector.FillCircle(dst, float32(c.X), float32(c.Y), wheelSlot, hudBg, true)
 		switch {
 		case i == w.hover && !locked:
 			vector.StrokeCircle(dst, float32(c.X), float32(c.Y), wheelSlot, 2, hudLine, true)
-		case i == p.Slot:
+		case slot == p.Slot:
 			vector.StrokeCircle(dst, float32(c.X), float32(c.Y), wheelSlot, 1, textAmber, true)
 		default:
 			vector.StrokeCircle(dst, float32(c.X), float32(c.Y), wheelSlot, 1, color.RGBA{60, 70, 84, 255}, true)
 		}
-		var m ebiten.GeoM
-		m.Translate(math.Round(c.X)-12, math.Round(c.Y)-7)
-		o := gfx.SpriteOpts{}
-		if locked {
-			o.Alpha = 0.25
+		if slot >= 0 {
+			var m ebiten.GeoM
+			m.Translate(math.Round(c.X)-12, math.Round(c.Y)-7)
+			o := gfx.SpriteOpts{}
+			if locked {
+				o.Alpha = 0.25
+			}
+			gfx.DrawWithGeoM(dst, g.weapons[slot].Img, m, o)
 		}
-		gfx.DrawWithGeoM(dst, wp.Img, m, o)
 		key := fmt.Sprint(i + 1)
 		clr := color.Color(textAmber)
 		if locked {
@@ -109,11 +123,15 @@ func (g *Game) drawWheel(dst *ebiten.Image) {
 	}
 	// the highlighted gun's name and ammo in the middle
 	name, info := "MOVE THE MOUSE", "RELEASE Q TO SWITCH"
-	if i := w.hover; i >= 0 {
+	if i := g.wheelSlot(w.hover); i < 0 && w.hover >= 0 {
+		name, info = "HEAVY WEAPON", "NONE"
+	} else if i >= 0 {
 		name = g.weapons[i].Name
 		switch {
-		case i >= g.unlocked:
+		case !g.holds(i):
 			info = "LOCKED"
+		case g.weapons[i].Heavy:
+			info = fmt.Sprintf("%d LEFT  NO RELOADS", p.Mag[i])
 		case g.weapons[i].Ammo == 0:
 			info = fmt.Sprintf("%d / UNLIMITED", p.Mag[i])
 		default:

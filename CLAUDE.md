@@ -5,8 +5,9 @@ WASD to move, mouse to aim (full 360°), click to shoot.
 Go + **Ebitengine v2** (`github.com/hajimehoshi/ebiten/v2`), pixel art at 24×24 per tile/frame.
 
 **Status:** playable prototype. Three station decks (Habitat, Reactor, Hydroponics), each
-played as 4 waves and a boss, the marine with 360° aiming and six weapons (three unlocked by clearing waves),
-crawlers / spitters / drones / bombers / brutes, three bosses (the Brood Mother, the Warden,
+played as 5 waves and a boss, the marine with 360° aiming, six guns (four found as drops) and two heavy weapons (minigun,
+flamethrower: rare, no reloads),
+crawlers / spitters / drones / bombers / brutes / splitters / shield-bearers / nests, three bosses (the Brood Mother, the Warden,
 the Maw),
 magazines and reloading,
 health and ammo pickups, sliding doors, explosive barrels, HUD, sounds, music, win/lose and restart. See "Prototype: what exists" and "Next steps" at the end.
@@ -94,7 +95,7 @@ fight simulation; port its logic rather than reinventing it.
 - Doors (wall-face tiles, also a 3-frame slide animation): `door_closed`, `door_half`, `door_open`.
 - Props, drawn over a floor tile, with their own drop shadow: `crate`, `console`, `barrel_toxic`,
   `barrel_explosive`, `locker`, `terminal`. Decals (transparent overlays): `decal_acid`,
-  `decal_scorch`, `decal_cables`.
+  `decal_scorch`, `decal_cables`, `decal_crate_wreck` (left where a crate broke; appended last).
 - **Wall autotiling** (same rule as `make_tiles.wall_tile_for`): a wall cell with floor directly
   below draws its face variant; any other wall cell draws `wall_cap_{mask}` (index
   `wall_cap_base_index + mask`), where mask bits mark which sides touch floor
@@ -109,17 +110,24 @@ fight simulation; port its logic rather than reinventing it.
 - Every 24×24 frame has its **feet / ground contact at about (12, 21)**: anchor entities there and
   y-sort by feet. Bigger frames follow the same rule, `(size/2, size-3)` (the boss: (24, 45)).
 - Only `*_right` facings are drawn; **left = the right frames flipped horizontally**
-  (player diagonals, crawler, bomber and brute too). Spitter, drone and boss face the camera.
+  (player diagonals, crawler, bomber, brute, splitter and shield-bearer too). Spitter,
+  drone, nest and bosses face the camera.
 - `loop: false` animations play once, then hold the last frame (death) or return to idle.
 - Enemies: `crawler.walk_right/attack_right/death` (fast melee), `spitter.idle/attack/death`
   (stationary, lobs acid; the glob should leave on attack frame 2), `drone.idle/attack/death`
   (hovering, shoots a laser; it fires on attack frame 2), `bomber.walk_right/attack_right/death`
   (attack = swelling before it bursts), `brute.walk_right/attack_right/death` (attack frames
-  0-1 wind-up, 2-3 charge), `brood.idle/attack/death`, `warden.idle/attack/death` and
+  0-1 wind-up, 2-3 charge), `splitter.walk_right/attack_right/death`,
+  `shielder.walk_right/attack_right/death` (attack 0-1 brace, 2-3 bash) plus `shielder.shield`
+  (one frame: the plate pointing right, rotated around the body toward its heading like the
+  player's gun, behind the body when it points up), `nest.idle/attack/death` (faces the
+  camera; attack = a crawler being born), `brood.idle/attack/death`, `warden.idle/attack/death` and
   `maw.idle/attack/death` (48×48, in bosses.png; the Maw stands in its hole at the bottom of
   the frame, and the game sinks and raises it by cropping the frame at the feet).
 - FX: `bullet`, `laser`, `plasma`, `grenade`, `spine` (all point right: rotate to the heading),
-  `hit_spark`, `acid_glob`, `acid_splash`, `explosion`, `muzzle_flash`, `crosshair`.
+  `hit_spark`, `acid_glob`, `acid_splash`, `explosion`, `muzzle_flash`, `crosshair`, `debris`
+  (a crate breaking), `flame` (a flamethrower puff, drawn by the shot's age so it swells,
+  reddens and fades over its life).
 - Font (`font.png`, metadata under `"font.png"`): 5×7 uppercase glyphs (`GLYPHS` in
   make_sprites.py), white with a baked 1px dark outline, one 7×9 cell each in `chars` order,
   6 px advance. `Font.Draw` tints them and scales by whole numbers (titles are 2×); lower case
@@ -146,7 +154,11 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
    (most spare rounds carried; 0 = unlimited, the pistol), and optionally `projectile` (fx anim, default `bullet`), `pierce` (enemies a shot
    passes through: plasma) and `blast` (explosion radius instead of a hit: launcher, which
    also bursts at the end of its range and can hurt the player). The shotgun fans 5 pellets
-   evenly across its spread.
+   evenly across its spread. Heavy weapons add `heavy` (no reloads: `mag` is all the ammo,
+   and it's thrown away when empty), `spin_ms` (trigger time before it fires: minigun),
+   `move_mul` (move speed while firing), `life_ms` (shot life instead of 0.9 s) and `flame`
+   (no sparks or hit sounds, slows down as it flies, not stopped by shields, burns crates
+   and sets off barrels).
 
 ### Gameplay numbers used in the preview sim (starting values, tune freely)
 - Crawler: 3 HP, chases at ~36 px/s, bites at ~15 px range every 0.7 s.
@@ -171,11 +183,13 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
 
 - **Controls:** WASD/arrows move, mouse aims, LMB fires (pistol and launcher semi-auto, the
   rest automatic), R reloads, 1-6 (pistol, rifle, shotgun, smg, plasma, launcher; `weaponOrder`,
-  look guns up with `slotOf`, never by number), the mouse wheel cycles unlocked weapons;
+  look guns up with `slotOf`, never by number), 7 the heavy weapon carried (`heavyOrder`,
+  `Player.Heavy`; `g.key(slot)` is a slot's key), the mouse wheel cycles held weapons;
   each deck starts with the rifle in hand. Esc/P pause,
   F fullscreen, M mute. Restart is R in the pause menu, or R / click after dying or winning.
 - **Weapon wheel** (`wheel.go`): hold Q and all six guns appear in a ring (fixed spots,
-  pistol at the top, clockwise in key order; locked ones dimmed); moving the mouse away from
+  pistol at the top, clockwise in key order; locked ones dimmed), plus a 7th spot for the
+  heavy weapon (`wheelSpots`, `wheelSlot`); moving the mouse away from
   where it was highlights the gun in that direction, releasing Q switches to it, and a quick
   tap (< 0.25 s, no pick) still cycles. While it is open time runs at 25% (`dt` is set per
   Update from `tick`), the aim holds and nothing fires. `Game.step(in)` runs one tick with
@@ -185,19 +199,39 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   drops a reload in progress. Out of spare rounds the trigger only clicks (`dry_fire`); the
   pistol never runs out.
 - **Pickups** (`pickups.go`): dying enemies may drop one (`dropChance`: crawler 12%,
-  spitter/drone 40%, brute always; bombers and the boss's brood never), 40% health (+2 HP)
+  spitter/drone 40%, splitter 30%, shield-bearer 50%, brute and nest always; bombers, the
+  boss's brood and crawlers from a nest or splitter, marked by `Enemy.Parent`, never) and
+  broken crates `crateDrop` (50%) of the time (`dropAt`), 40% health (+2 HP)
   and 60% ammo (half a full load of spare rounds for every unlocked gun). Walk over to
   collect; one you can't use stays on the floor. They vanish after 25 s, blinking for the
   last 4.
+- **Heavy weapons** (`dropHeavy`, `pickHeavy`): the minigun (160 rounds, spins up for
+  0.4 s, very fast, you move at 55% while firing) and the flamethrower (110 puffs, ~4.4 s:
+  a short jet that goes through every enemy in its path and stops at walls). Clearing wave
+  `heavyWave` (4) drops a random one for the last wave and the boss; brutes, shield-bearers,
+  splitters and nests sometimes drop one instead of health/ammo (`heavyChance`, 2–10%).
+  Only one lies on the floor at a time and it doesn't vanish. Walking over one puts it
+  straight in your hands, replacing the heavy you carried; ammo pickups don't refill it,
+  R doesn't reload it, and when it runs dry it's thrown away and you're back on the gun
+  you held before (`LastGun`). Heavies don't come along to the next deck or a retry. The
+  bot uses one on anything in sight (the flamethrower only within 80 px).
+- **Gun drops** (`dropGun`): you start with pistol and rifle; the rest unlock in
+  `weaponOrder` by picking up a dropped gun (`pickWeapon`, drawn as the gun itself,
+  glinting). Clearing wave `gunWave` (2) drops the next gun you lack where the last enemy
+  died, every boss drops one, and a brute does `bruteGunChance` (10%) of the time instead of
+  health/ammo. Guns on the floor never vanish and can only be taken in order; one still
+  lying there when the deck ends comes along anyway. So with only the guaranteed drops you
+  have 2, 4, then 6 guns at the start of each deck (`level.unlocked`, the minimum).
 - **Decks** (`levels` in `internal/game/waves.go`): each has a name, a map, its wave list,
-  its boss (map letter `M` Brood Mother, `W` Warden, `O` the Maw) and how many weapons it
-  starts with (3, then 6, 6). Beating a deck's boss starts the next deck after 2.5 s with full HP and ammo;
-  dying (or R in the pause menu) retries the current deck from its start; after the last
+  its boss (map letter `M` Brood Mother, `W` Warden, `O` the Maw) and the fewest weapons it
+  starts with (2, then 4, 6; more if you found extra). Beating a deck's boss starts the next deck after 2.5 s with full HP and ammo,
+  keeping the guns found (`carried`);
+  dying (or R in the pause menu) retries the current deck from its start with the guns held then; after the last
   deck the station is clear and R / click starts again from deck 1.
-- **Waves**: wave 1 is the enemies placed in the map; then each string in the deck's
+- **Waves**: five per deck. Wave 1 is the enemies placed in the map; then each string in the deck's
   `waves` (map letters, one per enemy) trickles in through the outer doors away from the
   player; then the boss appears at the map's `Q`. Between waves: a 4 s break, +3 HP (full
-  HP before the boss) and the next weapon unlocks (smg, plasma, launcher). Killing a boss
+  HP before the boss), and after wave 2 a gun drop. Killing a boss
   kills its minions.
 - **Doors** (`D` in the map, `=` starts open; need floor below): inner doors (floor above too)
   slide open (`door_closed/half/open`, 0.25 s) while the player or an enemy is within 40 px;
@@ -212,7 +246,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   draw underneath; projectiles and FX on top. Hit flash uses `colorm`.
 - **Sound** (`internal/game/sfx.go`): `g.sound(name, pos)` plays a random variant, quieter
   with distance from the player (floor 0.15 at 340+ px); repeats of one sound within 40 ms are
-  dropped. Wired so far: weapon shots (named like the weapon) and bullet hits: `hit_flesh`
+  dropped. Wired so far: weapon shots (named like the weapon; the flamethrower's roar
+  plays every 6th puff) and bullet hits: `hit_flesh`
   (crawler, spitter), `hit_metal` (drone, explosive barrel), `hit_wall` (walls, other props),
   `hurt` / `player_death`, `<kind>_death` per enemy (`deathSound` in `enemy.go`), `explosion`
   (barrels, bombers, grenades), `door`, `boss_roar`, `pickup`, `reload`, `dry_fire`, and
@@ -240,18 +275,29 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   spitters lob acid that leads the player (a growing ground marker shows where it lands);
   drones keep 85–140 px away, strafe, fly over props and fire lasers; bombers run in, swell
   for 0.5 s and burst (shooting one sets it off, hurting enemies nearby too); brutes (20 HP)
-  wind up and charge in a straight line, stopping at walls. Bosses (`updateBoss`) hurt on
-  contact and get faster with bigger attacks below half HP. The Brood Mother (120 HP)
+  wind up and charge in a straight line, stopping at walls. Splitters (`Y`, 9 HP) bite like
+  crawlers and burst into `splitBrood` (3) crawlers of `splitHP` (2) HP. Shield-bearers
+  (`U`, 14 HP) carry a shield covering `shieldArc` either side of `Face`, which turns toward
+  the player at `shieldTurn` (1.3 rad/s, slow enough to circle round at ~60 px); `blocks`
+  stops bullets and pellets hitting it from the front (blasts still hurt), they bash for 2
+  up close and the shield is down from the bash until the attack ends. Nests (`N`, 24 HP,
+  map-only, two in Hydroponics) never move and once awake birth a crawler every ~3.6 s,
+  keeping at most `nestBrood` (3) alive. Splitters debut on deck 1, shield-bearers on deck
+  2; deck 3 mixes both with its nests. Bosses (`updateBoss`) hurt on
+  contact and get faster with bigger attacks below half HP. The Brood Mother (140 HP)
   crawls after the player and cycles a ring of slow spines, an acid barrage and summoning
   crawlers. The Warden (80 HP, 2.4 s between attacks) hovers 60–100 px away and cycles a
   slow fan of 3 lasers, mortar shells (an orange ground marker shows the blast; they hurt
-  enemies too) and deploying drones. The Maw (100 HP, `updateMaw`) never walks: above
+  enemies too) and deploying drones. The Maw (85 HP, `updateMaw`) never walks: above
   ground it alternates a line of acid globs that land one after another and a cone of
   spines, and between them it burrows (state `stUnder`, `hidden()`: no hits, no contact):
   it sinks, digs toward the player as a dirt mound, waits 0.7 s under an orange marker,
   then bursts out (`blast` plus a ring of spines; crawlers too when enraged). Out of the
   player's sight it always burrows. Timings are the `maw*` constants. Crates block bullets, lasers and spines in both
-  directions (cover).
+  directions (cover), but only for a while: they have 10 HP (`propHP` in level.go), player
+  bullets and blasts wear them down (`damageProp` in combat.go; enemy shots don't), and a
+  broken crate leaves `decal_crate_wreck` (`g.wrecks`), debris, a `crate_break` sound and
+  sometimes a pickup. Other props can't be broken.
 - **Explosive barrels** take 3 hits, damage everything within ~44 px and chain to nearby barrels
   (`blast` in combat.go, shared with bombers and grenades).
 - **Dev tools** (`internal/game/devtools.go`): `BZ_AUTOPILOT=1` lets a bot play
@@ -264,7 +310,7 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   two recorded bot runs.
 - **Tests:** world parsing/connectivity (every spawn reachable), autotile vs the Python
   golden data, collision, line of sight, flow-field following, metadata completeness,
-  facing sectors, doors, the wave → boss → clear flow, reloading, pickups, music choice, and full rounds
+  facing sectors, doors, the wave → boss → clear flow, reloading, pickups, gun drops, music choice, and full rounds
   played by the autopilot
   (clear, death, restart, barrel chains), and walking through every wave of every deck.
   `TestDifficulty` plays 20 seeded games of each deck (all waves and the boss) with the
@@ -283,9 +329,12 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   games (~4.6/8 HP left) and deck 2 in 10/20 (~4.0/8), in ~150 s each; most deaths were to
   the bosses. Those numbers were partly the bot getting stuck (~4% of its time): once it
   stopped (below) it beats deck 1 in 18/20 and deck 2 in 13/20 with ~5/8 HP left (with
-  the weapon wheel use below). Deck 3 (Hydroponics, the Maw) was tuned to 12/20 with
-  ~2.3/8 HP left, the hardest deck on purpose; the Maw's spines did most of the damage, so
-  their counts (ring 8/12, cone 5/7) and its 2.2 s cooldown are its levers. The
+  the weapon wheel use below). Deck 3 (Hydroponics, the Maw) is the hardest on purpose:
+  ~58% clears over 60 seeds (14/20 in the test) with ~3/8 HP left. The Maw's spines did most
+  of the damage, so their counts (ring 8/12, cone 5/7), its 2.2 s cooldown and its HP are its
+  levers. Breakable crates cost deck 3 about 13 points of clear rate (its arena cover wears
+  away), which the Maw going 100 → 90 HP gave back. Deck 3 sits near the test's 50% line, so
+  20 seeds swing a few clears on any change: measure with more rounds before tuning. The
   game itself wasn't retuned after that; if it now feels easy to a person, raise difficulty
   and the guard-rail together. Reload time was the biggest lever (1.2 s rifle reloads dropped deck 1 to
   2/20); for the Warden it was its attack rate (2.0 s → 3/20, 2.4 s → 10/20). Explosive
@@ -297,10 +346,21 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   sideways when blocked behind, and takes a 0.5 s detour after 0.75 s of not moving.
   When no enemy is within 120 px it switches guns with the weapon wheel like a person
   (holds Q for 0.45 s, sweeping the mouse toward the gun), otherwise with number keys.
-  Pickups never drop where the player can't stand (`reachableNear`). Levers: each deck's `waves`, boss `hp` and `cooldown`,
+  Pickups never drop where the player can't stand (`reachableNear`). Since guns became drops (November 2026) the bot clears
+  deck 1 in 44/60 (it fights without the shotgun until wave 3 and the smg until deck 2),
+  deck 2 in 52/60 and deck 3 in 35/60. With splitters, shield-bearers, nests and a 5th wave
+  per deck (November 2026) it clears 43/60, 52/60 and 40/60 (the Maw went 90 → 85 HP to
+  pay for the extra wave; nearly all deck 3 deaths are at the Maw). Shield-bearers were the
+  big lever: at 2 rad/s turning the bot never got behind one and cleared 0/20 on decks 2
+  and 3. The bot prefers targets whose shield isn't toward it, holds fire at a raised
+  shield and circles it. With heavy weapons (November 2026) it kept too much HP on deck 1
+  (6.2/8 left, the guard-rail is 6), mostly from using the guaranteed heavy on the Brood
+  Mother, so she went 120 → 140 HP and heavy ammo and drop chances were trimmed; now
+  48/60, 45/60 and 42/60 with ~5, 5 and 4 HP left. Levers: `heavyWave`, `heavyChance`,
+  heavy `mag`, each deck's `waves`, boss `hp` and `cooldown`, `gunWave`, `bruteGunChance`,
   `waveHeal`, `reload_ms`, `dropChance`.
-- Destructible crates that drop pickups; ammo is plentiful for the bot, so `dropChance`
-  and `ammo` could tighten if it never feels scarce.
+- Ammo is plentiful for the bot (more so with crates dropping pickups), so `dropChance`,
+  `crateDrop` and `ammo` could tighten if it never feels scarce.
 - More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call. Music per
   deck (e.g. the Reactor transposed or with its own lead) would be new `TRACKS` entries
   plus a deck field choosing them.

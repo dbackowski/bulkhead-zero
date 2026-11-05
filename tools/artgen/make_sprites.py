@@ -443,9 +443,67 @@ def weapon_launcher():
                         "mag": 4, "reload_ms": 1600, "ammo": 12}
 
 
+# Heavy weapons: found rarely, one carried at a time, no reloads ("heavy"):
+# "mag" is all the ammo it has and it is thrown away when empty.
+def weapon_minigun():
+    w = new(24, 12)
+    rect(w, 2, 3, 9, 8, G1)                  # motor housing
+    rect(w, 2, 3, 9, 3, G2)
+    rect(w, 2, 8, 9, 8, G0)
+    rect(w, 4, 5, 6, 6, AMB)                 # warning plate
+    for y, c in ((4, G2), (6, G1), (8, G2)):  # three rotating barrels
+        rect(w, 10, y, 21, y, c)
+    rect(w, 10, 4, 10, 8, G0)                # barrel clamps
+    rect(w, 17, 4, 17, 8, G0)
+    rect(w, 22, 4, 22, 8, G0)
+    rect(w, 4, 9, 7, 10, G0)                 # ammo belt feed
+    put(w, 5, 10, AMB_D)
+    _glove(w, 5, 7)
+    return outline(w), {"pivot": [5, 7], "muzzle": [23, 6], "fire_ms": 45, "spread_deg": 6,
+                        "pellets": 1, "recoil_px": 1, "bullet_speed": 440, "damage": 1,
+                        "mag": 160, "heavy": True, "spin_ms": 400, "move_mul": 0.55}
+
+
+def weapon_flamethrower():
+    w = new(24, 12)
+    ellipse(w, 4, 6, 3, 3.4, RED_D)          # fuel tank
+    ellipse(w, 3.5, 5, 1.6, 1.6, RED)
+    rect(w, 7, 5, 17, 6, G1)                 # body and nozzle
+    rect(w, 7, 5, 17, 5, G2)
+    rect(w, 18, 4, 20, 7, G0)                # flared tip
+    put(w, 21, 5, FLASH2)                    # pilot light
+    put(w, 21, 6, AMB)
+    line(w, 5, 9, 9, 7, G0)                  # hose
+    rect(w, 11, 7, 12, 9, G0)                # grip
+    _glove(w, 9, 7)
+    return outline(w), {"pivot": [9, 7], "muzzle": [21, 6], "fire_ms": 40, "spread_deg": 9,
+                        "pellets": 1, "recoil_px": 0, "bullet_speed": 190, "damage": 1,
+                        "mag": 110, "heavy": True, "projectile": "flame", "pierce": 99,
+                        "life_ms": 380, "flame": True}
+
+
 def weapons():
     return {"rifle": weapon_rifle(), "pistol": weapon_pistol(), "shotgun": weapon_shotgun(),
-            "smg": weapon_smg(), "plasma": weapon_plasma(), "launcher": weapon_launcher()}
+            "smg": weapon_smg(), "plasma": weapon_plasma(), "launcher": weapon_launcher(),
+            "minigun": weapon_minigun(), "flamethrower": weapon_flamethrower()}
+
+
+def flame_anim():
+    """A puff of the flamethrower's fire over its short life: a hot core that
+    swells, reddens and thins into smoke (drawn by age, not rotated)."""
+    frames = []
+    stages = [(2.5, WHITE, FLASH1), (4, FLASH1, FLASH2), (5.5, FLASH2, (232, 110, 40, 255)),
+              (6.5, (232, 110, 40, 255), RED_D), (7, (110, 60, 50, 200), (60, 50, 50, 120))]
+    for i, (r, inner, outer) in enumerate(stages):
+        img = new()
+        rng = random.Random(40 + i)
+        ellipse(img, 12, 12, r, r * .85, outer)
+        ellipse(img, 12, 11.5, r * .6, r * .5, inner)
+        for _ in range(5):
+            ang = rng.random() * math.tau
+            put(img, 12 + math.cos(ang) * (r + .5), 12 + math.sin(ang) * r * .85, outer)
+        frames.append(fade(img, 1 - i * .12))
+    return frames
 
 
 def pickup(kind, glint):
@@ -805,6 +863,197 @@ def brute_anims():
 
 
 # ============================================================================
+# ENEMY 6 - Splitter (a fat grub carrying a brood in a see-through sac).
+# Faces right; mirror for left. Bites like a crawler; when it dies the sac
+# bursts and three small crawlers come out.
+# ============================================================================
+def splitter(leg_phase=0, bob=0, mouth=0, lunge=0, pulse=0):
+    body = new()
+    cy = 14 + bob
+    for i, lx in enumerate((7, 10, 13, 16)):        # far legs
+        swing = 2 if (i + leg_phase) % 2 else -1
+        line(body, lx + lunge, cy + 2, lx + lunge + swing - 1, 20, M0)
+    sx = 9 + lunge                                   # the sac with its brood
+    ellipse(body, sx, cy - 1, 6.5 + pulse * .5, 5 + pulse * .4, M1)
+    ellipse(body, sx - 1, cy - 2.5, 4.5, 2.4, M2)
+    for ex, ey in ((-3, -1), (0, -3), (1, 1)):       # curled shapes inside
+        ellipse(body, sx + ex, cy + ey, 1.6, 1.1, X1)
+        put(body, sx + ex + 1, cy + ey, ACID)
+    put(body, sx - 3, cy - 4, M3)
+    for vx in (-4, 2):                               # sac seams
+        line(body, sx + vx, cy - 5, sx + vx + 1, cy + 3, M0)
+    hx, hy = 17 + lunge, cy + 1                      # head
+    ellipse(body, hx - 1, hy, 3, 2.4, X1)
+    ellipse(body, hx, hy - .5, 2.4, 1.6, X2)
+    put(body, hx + 1, hy - 1, ACID)
+    put(body, hx + 1, hy - 2, ACID_L)
+    jaw = [1, 2, 3][mouth]
+    line(body, hx + 2, hy, hx + 4, hy - jaw + 1, BONE)
+    line(body, hx + 2, hy + 1, hx + 4, hy + jaw, BONE)
+    for i, lx in enumerate((8, 11, 14, 17)):        # near legs
+        swing = -2 if (i + leg_phase) % 2 else 1
+        line(body, lx + lunge, cy + 2, lx + lunge + swing + 1, 20, M2)
+        put(body, lx + lunge + swing + 1, 20, M3)
+    return outline(body)
+
+
+def splitter_anims():
+    a = {}
+    a["walk_right"] = [with_shadow(splitter(leg_phase=p, bob=b, pulse=u), rx=9)
+                       for p, b, u in ((0, 0, 0), (1, -1, 1), (0, 0, 0), (1, -1, 1))]
+    a["attack_right"] = [
+        with_shadow(splitter(lunge=-2, mouth=1), rx=9),
+        with_shadow(splitter(lunge=2, mouth=2, leg_phase=1), rx=9),
+        with_shadow(splitter(lunge=3, mouth=0, leg_phase=1), rx=9),
+        with_shadow(splitter(lunge=1, mouth=1), rx=9),
+    ]
+    torn = new()                                     # the empty, burst sac
+    ellipse(torn, 11, 18, 9, 3, M0)
+    ellipse(torn, 11, 17, 6.5, 2.2, M1)
+    for tx, ty in ((6, 15), (9, 14), (13, 14), (16, 15)):
+        line(torn, tx, ty, tx + 1, ty + 2, M2)
+    ellipse(torn, 14, 19, 3, 1, ACID_D)
+    torn = outline(torn)
+    splat = new()
+    rng = random.Random(17)
+    for _ in range(16):
+        ang = rng.random() * math.tau
+        r = rng.uniform(4, 10)
+        put(splat, 11 + math.cos(ang) * r, 12 + math.sin(ang) * r * .7, rng.choice([M2, M3, ACID, ACID_D]))
+    a["death"] = [
+        with_shadow(tint(splitter(pulse=2), WHITE, .85), rx=9),
+        with_shadow(Image.alpha_composite(splitter(pulse=3), splat), rx=10),
+        Image.alpha_composite(torn, splat),
+        torn,
+    ]
+    return a
+
+
+# ============================================================================
+# ENEMY 7 - Shield-bearer (an infested security trooper in riot armour).
+# Faces right; mirror for left. The shield is a separate sprite ("shield",
+# a plate pointing right) that the game rotates around the body toward its
+# heading, the way the player's gun is drawn.
+# ============================================================================
+def shielder(step=0, bob=0, lean=0, arm=0):
+    body = new()
+    by = 12 + bob
+    rect(body, 8 + step, by + 3, 10 + step, 20, U0)            # far leg
+    rect(body, 8 + step, 19, 11 + step, 20, U0)
+    ellipse(body, 11 + lean, by + 1, 5.5, 5.5, G1)              # armoured torso
+    ellipse(body, 10 + lean, by - 1, 4, 3, G2)
+    put(body, 9 + lean, by - 2, G3)
+    for fx, fy in ((8, by + 3), (13, by - 2)):                 # flesh bulging through
+        ellipse(body, fx + lean, fy, 1.6, 1.2, X2)
+        put(body, fx + lean, fy, X3)
+    rect(body, 12 - step, by + 4, 14 - step, 20, G1)            # near leg
+    rect(body, 12 - step, 19, 15 - step, 20, U1)
+    hx, hy = 13 + lean, by - 6                                  # helmet with a red visor
+    ellipse(body, hx, hy, 3.2, 2.8, G1)
+    ellipse(body, hx - 1, hy - 1, 2, 1.2, G2)
+    line(body, hx + 1, hy, hx + 3, hy, RED)
+    put(body, hx + 3, hy - 1, RED_D)
+    ex, ey = 16 + lean + arm, by + 1                            # arm out front, holding the shield
+    line(body, 12 + lean, by - 1, ex, ey, X1)
+    line(body, 12 + lean, by, ex, ey + 1, X2)
+    return outline(body)
+
+
+def shield_plate():
+    """The riot shield, pointing right: a tall plate centred in the frame."""
+    img = new()
+    rect(img, 11, 4, 13, 19, G1)
+    rect(img, 13, 5, 13, 18, G3)              # front edge catching the light
+    rect(img, 11, 4, 11, 19, G0)
+    line(img, 12, 6, 12, 17, G2)
+    for y in (8, 15):
+        put(img, 12, y, CY)                   # warning lights
+    put(img, 12, 11, AMB)
+    put(img, 12, 12, AMB_D)
+    return outline(img)
+
+
+def shielder_anims():
+    a = {}
+    a["walk_right"] = [with_shadow(shielder(step=s, bob=b), rx=8)
+                       for s, b in ((0, 0), (1, -1), (0, 0), (-1, -1))]
+    a["attack_right"] = [                                       # 0-1 brace, 2-3 bash
+        with_shadow(shielder(lean=-2, arm=-1), rx=8),
+        with_shadow(shielder(lean=-2, arm=-2, bob=1), rx=8),
+        with_shadow(shielder(lean=2, arm=2, step=1), rx=8),
+        with_shadow(shielder(lean=3, arm=2, step=-1, bob=-1), rx=8),
+    ]
+    a["shield"] = [shield_plate()]
+    alive = shielder()
+    lying = shift(alive.rotate(-90, resample=Image.NEAREST), 2, 5)
+    plate = shift(shield_plate().rotate(90, resample=Image.NEAREST), -3, 8)
+    pool = new()
+    ellipse(pool, 12, 19, 9, 2.6, X0)
+    ellipse(pool, 11, 19, 5, 1.4, X1)
+    a["death"] = [
+        with_shadow(tint(alive, WHITE, .85), rx=8),
+        with_shadow(shift(shielder(lean=-2, arm=-2), 0, 1), rx=8),
+        with_shadow(Image.alpha_composite(lying, plate), rx=10),
+        Image.alpha_composite(pool, Image.alpha_composite(lying, plate)),
+    ]
+    return a
+
+
+# ============================================================================
+# ENEMY 8 - Nest (a pulsing hive mound that births crawlers). Faces the camera.
+# ============================================================================
+def nest(pulse=0.0, open=0, burst=False):
+    body = new()
+    ellipse(body, 12, 18, 10, 3.6, X0)                          # roots spreading on the floor
+    for rx, ry in ((2, 19), (21, 18), (5, 21), (19, 21)):
+        line(body, 12, 18, rx, ry, X0)
+    if burst:
+        ellipse(body, 12, 16, 8, 3.5, X1)
+        ellipse(body, 12, 15.5, 5, 2, ACID_D)
+        for tx, ty in ((5, 13), (8, 11), (15, 11), (18, 13)):
+            line(body, tx, ty, tx + (1 if tx < 12 else -1), ty + 4, X2)
+        return outline(body)
+    r = 7.5 + pulse
+    ellipse(body, 12, 13 - pulse * .5, r, 6.5 + pulse * .7, X1)  # the dome
+    ellipse(body, 10, 10 - pulse * .5, r * .55, 3, X2)
+    put(body, 8, 9, X3)
+    for vx0, vx1 in ((6, 8), (17, 15), (11, 12)):              # veins
+        line(body, vx0, 16, vx1, 8, X0)
+    for hx, hy in ((7, 14), (17, 13)):                           # small glowing pores
+        put(body, hx, hy, ACID_D)
+        put(body, hx, hy - 1, ACID)
+    w = [1, 2, 3, 4][open]                                       # the mouth on top
+    ellipse(body, 12, 9 - pulse * .5, w, max(1, w * .6), X0)
+    if open:
+        ellipse(body, 12, 9 - pulse * .5, w - .6, max(.6, w * .4), ACID if open > 1 else ACID_D)
+    return outline(body)
+
+
+def nest_anims():
+    a = {}
+    a["idle"] = [with_shadow(nest(pulse=p), rx=10) for p in (0, .4, .8, .4)]
+    a["attack"] = [                                              # the birth: swell, open, push out
+        with_shadow(nest(pulse=1.2, open=1), rx=10),
+        with_shadow(nest(pulse=1.6, open=2), rx=10),
+        with_shadow(nest(pulse=1.0, open=3), rx=10),
+        with_shadow(nest(pulse=.4, open=1), rx=10),
+    ]
+    splat = new()
+    rng = random.Random(23)
+    for _ in range(18):
+        ang = rng.random() * math.tau
+        r = rng.uniform(5, 11)
+        put(splat, 12 + math.cos(ang) * r, 11 + math.sin(ang) * r * .7, rng.choice([X2, X3, ACID, ACID_L]))
+    a["death"] = [
+        with_shadow(tint(nest(pulse=1.8, open=3), WHITE, .85), rx=10),
+        with_shadow(Image.alpha_composite(nest(pulse=2, open=3), splat), rx=10),
+        Image.alpha_composite(nest(burst=True), splat),
+        nest(burst=True),
+    ]
+    return a
+
+
+# ============================================================================
 # BOSS - Brood Mother, 48x48 frames (feet at 24, 45). Faces the camera.
 # ============================================================================
 B = 48
@@ -1119,6 +1368,28 @@ def fx_anims():
             ang = rr.random() * math.tau
             put(img, 12 + math.cos(ang) * (r + 1), 12 + math.sin(ang) * (r + 1), outer)
         a["explosion"].append(img)
+    a["debris"] = []  # a crate breaking: plates and bits fly out and drop
+    rr = random.Random(12)
+    bits = [(rr.uniform(0, math.tau), rr.uniform(2, 7), rr.uniform(18, 44), rr.uniform(-30, -8),
+             rr.choice((0, 1, 1, 2)), rr.random() < .5) for _ in range(18)]
+    shades = [(170, 110, 70, 255), (120, 70, 44, 255), (70, 40, 26, 255)]
+    for i in range(5):
+        img = new()
+        if i < 3:  # dust
+            ellipse(img, 12, 13, 5 + i * 2.5, 4 + i * 1.8, (190, 180, 160, 150 - i * 40))
+        t = i * .07
+        for ang, r0, v, up, c, big in bits:
+            r = r0 + v * t
+            x = 12 + math.cos(ang) * r
+            y = 13 + math.sin(ang) * r * .6 + up * t + 170 * t * t
+            put(img, x, y, shades[c])
+            if big:
+                put(img, x + 1, y, shades[c])
+                put(img, x, y + 1, shades[min(c + 1, 2)])
+                put(img, x + 1, y + 1, shades[min(c + 1, 2)])
+        if i == 0:
+            rect(img, 10, 11, 12, 12, AMB)  # the latch flies too
+        a["debris"].append(fade(img, 1 - i * .15))
     return a
 
 
@@ -1207,6 +1478,7 @@ TIMING_MS = {  # per-frame durations used by the game and by the previews
     "idle": 180, "walk": 110, "hurt": 80, "death": 130, "attack": 90,
     "bullet": 50, "laser": 50, "hit_spark": 50, "acid_glob": 90, "acid_splash": 80, "explosion": 70,
     "muzzle_flash": 40, "crosshair": 300, "plasma": 60, "grenade": 100, "spine": 80, "pickup": 250,
+    "debris": 70, "flame": 76,
 }
 
 
@@ -1220,6 +1492,7 @@ def timing_for(anim):
 def build_all():
     fx = fx_anims()
     fx.update(player_fx())
+    fx["flame"] = flame_anim()
     return {
         "player": player_anims_cached(),
         "weapons": weapons(),
@@ -1231,6 +1504,9 @@ def build_all():
         "boss": boss_anims(),
         "warden": warden_anims(),
         "maw": maw_anims(),
+        "splitter": splitter_anims(),
+        "shielder": shielder_anims(),
+        "nest": nest_anims(),
         "fx": fx,
     }
 
@@ -1278,7 +1554,10 @@ def main():
                                                   ("spitter.", all_["spitter"]),
                                                   ("drone.", all_["drone"]),
                                                   ("bomber.", all_["bomber"]),
-                                                  ("brute.", all_["brute"])])
+                                                  ("brute.", all_["brute"]),
+                                                  ("splitter.", all_["splitter"]),
+                                                  ("shielder.", all_["shielder"]),
+                                                  ("nest.", all_["nest"])])
     b_sheet, b_meta = write_sheet("bosses.png", [("brood.", all_["boss"]), ("warden.", all_["warden"]),
                                                 ("maw.", all_["maw"])], size=B)
     t_sheet, t_meta = font_sheet()

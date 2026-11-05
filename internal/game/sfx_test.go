@@ -16,8 +16,8 @@ func TestSoundsExist(t *testing.T) {
 		t.Fatal(err)
 	}
 	names := append([]string{"hit_flesh", "hit_metal", "hit_wall", "hurt", "explosion",
-		"player_death", "laser", "spit", "acid_splash", "door", "boss_roar", "spine", "pickup", "reload", "dry_fire", "warden_alarm", "burrow",
-		"stinger_wave", "stinger_clear", "stinger_boss", "stinger_death", "stinger_victory"}, weaponOrder...)
+		"player_death", "laser", "spit", "acid_splash", "door", "boss_roar", "spine", "pickup", "reload", "dry_fire", "warden_alarm", "burrow", "crate_break",
+		"stinger_wave", "stinger_clear", "stinger_boss", "stinger_death", "stinger_victory"}, append(weaponOrder, heavyOrder...)...)
 	for _, n := range deathSound {
 		names = append(names, n)
 	}

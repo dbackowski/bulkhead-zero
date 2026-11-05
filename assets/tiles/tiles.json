@@ -46,7 +46,8 @@
     "41": "wall_inner_NW",
     "42": "wall_inner_SE",
     "43": "wall_inner_SW",
-    "44": "floor_soil"
+    "44": "floor_soil",
+    "45": "decal_crate_wreck"
   },
   "autotile": {
     "rule": "wall cell with floor below -> wall_face*; else wall_cap_{mask} where mask bits mark sides touching floor (N=1,E=2,S=4,W=8); then overlay wall_inner_{NE,NW,SE,SW} where both orthogonal neighbours are wall but the diagonal is floor. Off-map counts as wall.",

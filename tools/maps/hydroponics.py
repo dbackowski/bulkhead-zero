@@ -90,6 +90,7 @@ for x, y in ((5, 5), (11, 3), (24, 6), (33, 5), (38, 6), (5, 14), (38, 16), (17,
     put(x, y, 'C')
 put(13, 6, 'E'); put(36, 5, 'E')
 put(9, 8, 'G')
+for x, y in ((4, 8), (39, 8)): put(x, y, 'N')                # hive nests in the greenhouses
 rows = ["".join(r) for r in g]
 
 

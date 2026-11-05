@@ -22,14 +22,17 @@ const T = 24
 //	floors: . plate  g grate  h hazard  v vent  s light strip  o grow bed (soil)
 //	decals: a acid  z scorch  ~ cables
 //	props:  x crate  c console  k locker  t terminal  b toxic barrel  B explosive barrel
-//	spawns: @ player  C crawler  S spitter  R drone  E bomber  G brute  Q boss
+//	spawns: @ player  C crawler  S spitter  R drone  E bomber  G brute
+//	        Y splitter  U shield-bearer  N nest  Q boss
 const wallChars = "#LP!D="
 
 var floorChars = map[byte]string{'g': "floor_grate", 'h': "floor_hazard", 'v': "floor_vent", 's': "floor_lightstrip", 'o': "floor_soil"}
 var decalChars = map[byte]string{'a': "decal_acid", 'z': "decal_scorch", '~': "decal_cables"}
+var propHP = map[byte]int{'B': 3, 'x': 10}
 var propChars = map[byte]string{'x': "crate", 'c': "console", 'k': "locker", 't': "terminal", 'b': "barrel_toxic", 'B': "barrel_explosive"}
 
-// Prop is a solid one-tile object. Explosive barrels can be shot.
+// Prop is a solid one-tile object. Explosive barrels blow up and crates
+// break when their HP runs out; props with no HP can't be broken.
 type Prop struct {
 	Name      string
 	TX, TY    int
@@ -119,11 +122,11 @@ func Parse(rows []string) (*Level, error) {
 				l.Start, foundStart = feet, true
 			case c == 'Q':
 				l.Boss = feet
-			case strings.IndexByte("CSREG", c) >= 0:
+			case strings.IndexByte("CSREGYUN", c) >= 0:
 				l.Spawns = append(l.Spawns, Spawn{Kind: c, Pos: feet})
 			}
 			if name, ok := propChars[c]; ok {
-				p := &Prop{Name: name, TX: x, TY: y, Alive: true, Explosive: c == 'B', HP: 3}
+				p := &Prop{Name: name, TX: x, TY: y, Alive: true, Explosive: c == 'B', HP: propHP[c]}
 				l.Props = append(l.Props, p)
 				l.propAt[i] = p
 				l.solid[i] = true

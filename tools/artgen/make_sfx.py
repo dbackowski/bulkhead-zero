@@ -469,6 +469,34 @@ def burrow(rng, v):
                          0.3, size=1.3), fade=0.2)
 
 
+def crate_break(rng, v):
+    """A crate gives way: a crunch of bending metal, then bits clattering down."""
+    n = int(0.6 * RATE)
+    k = 1 + 0.06 * (v - 1)
+    crunch = env(biquad(noise(rng, n), "bp", 900 * k, q=1.2), 0.08)
+    thud = scale(tone(n, sweep(180 * k, 70, 0.03), 0.06), 0.8)
+    rattle = [0.0] * n
+    for _ in range(16):
+        i = int(rng.uniform(0.04, 0.45) * RATE)
+        f = rng.uniform(1800, 4200)
+        for j in range(int(0.03 * RATE)):
+            if i + j < n:
+                rattle[i + j] += math.sin(2 * math.pi * f * j / RATE) * math.exp(-j / (0.006 * RATE)) * rng.uniform(.3, .8)
+    return finish(reverb(drive(mix(scale(crunch, 2.5), scale(thud, 0.5), scale(rattle, 0.5)), 1.8), 0.15, size=0.7))
+
+
+def flamethrower(rng, v):
+    """A roaring gas jet: low rumbling noise with a hiss on top. Played every
+    few puffs, so it overlaps itself into a steady roar."""
+    n = int(0.32 * RATE)
+    fade_in = lambda i: min(1.0, i / (0.03 * RATE))
+    roar = biquad(noise(rng, n), "lp", 700 + 60 * v, q=1.2)
+    flutter = [x * (0.7 + 0.3 * math.sin(i / RATE * 2 * math.pi * (23 + 3 * v))) for i, x in enumerate(roar)]
+    hiss = scale(biquad(noise(rng, n), "bp", 3200, q=0.8), 0.25)
+    s = [fade_in(i) * x for i, x in enumerate(mix(scale(flutter, 1.4), hiss))]
+    return finish(drive(s, 1.6), fade=0.08)
+
+
 # name: (generator(rng, variant) -> samples, loudness). Loudness is the RMS of
 # the loudest 50 ms above 200 Hz, i.e. roughly how loud it sounds on laptop
 # speakers, so these numbers compare directly; peaks are capped at 0.9.
@@ -506,6 +534,10 @@ SOUNDS = {
     "warden_alarm": (warden_alarm, 0.22),
     "warden_death": (warden_death, 0.30),
     "burrow": (burrow, 0.22),
+    "crate_break": (crate_break, 0.16),
+    "minigun": (lambda rng, v: gun(rng, 0.2, 0.6, sweep(6000 - 300 * v, 1500, 0.01), 0.015,
+                                   sweep(170 - 8 * v, 80, 0.006), 0.01, 0.5, 2.2, 0.12, 0.7), 0.16),
+    "flamethrower": (flamethrower, 0.14),
 }
 
 

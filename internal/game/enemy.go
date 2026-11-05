@@ -19,11 +19,16 @@ const (
 	brood  // boss of deck 1, the Brood Mother
 	warden // boss of deck 2, a security mech
 	maw    // boss of deck 3, a giant worm that burrows
+	// appended after the bosses so the kinds above keep their values
+	splitter // bites like a crawler; bursts into small crawlers when it dies
+	shielder // a riot shield in front stops bullets: get around it
+	nest     // never moves, births crawlers until destroyed
 )
 
 // Map letters for each kind (see world/level.go), also used by the wave
 // lists; the bosses' letters are only used by the level list.
-var kindFor = map[byte]enemyKind{'C': crawler, 'S': spitter, 'R': drone, 'E': bomber, 'G': brute, 'M': brood, 'W': warden, 'O': maw}
+var kindFor = map[byte]enemyKind{'C': crawler, 'S': spitter, 'R': drone, 'E': bomber, 'G': brute, 'M': brood, 'W': warden, 'O': maw,
+	'Y': splitter, 'U': shielder, 'N': nest}
 
 func (e *Enemy) isBoss() bool { return e.Kind == brood || e.Kind == warden || e.Kind == maw }
 
@@ -60,10 +65,15 @@ var stats = map[enemyKind]enemyStats{
 	bomber: {hp: 2, radius: 8, aggro: 170, speed: 62, attackLen: 0.5},
 	// brute: winds up until fireAt, then charges until attackLen
 	brute:  {hp: 20, radius: 11, aggro: 190, speed: 30, cooldown: 2.4, attackLen: 1.15, fireAt: 0.55},
-	brood:  {hp: 120, radius: 17, aggro: 999, speed: 24, cooldown: 1.6, attackLen: 0.7, fireAt: 0.35},
+	brood:  {hp: 140, radius: 17, aggro: 999, speed: 24, cooldown: 1.6, attackLen: 0.7, fireAt: 0.35},
 	warden: {hp: 80, radius: 16, aggro: 999, speed: 22, cooldown: 2.4, attackLen: 0.8, fireAt: 0.3},
 	// maw: speed is how fast it digs toward the player underground
-	maw: {hp: 100, radius: 15, aggro: 999, speed: 105, cooldown: 2.2, attackLen: 0.6, fireAt: 0.3},
+	maw:      {hp: 85, radius: 15, aggro: 999, speed: 105, cooldown: 2.2, attackLen: 0.6, fireAt: 0.3},
+	splitter: {hp: 9, radius: 10, aggro: 170, speed: 44, cooldown: 0.8, attackLen: 0.36, fireAt: 0.18},
+	// shielder: braces until fireAt, bashes, then the shield is down until attackLen
+	shielder: {hp: 14, radius: 10, aggro: 190, speed: 36, cooldown: 1.4, attackLen: 1.0, fireAt: 0.4},
+	// nest: cooldown is the time between births
+	nest: {hp: 24, radius: 11, aggro: 200, speed: 0, cooldown: 3.2, attackLen: 0.45, fireAt: 0.3},
 }
 
 // Enemy shots: how far ahead they aim (seconds of player movement) and laser speed (px/s).
@@ -87,6 +97,13 @@ const (
 	mawRise   = 0.4
 	mawBurst  = 38.0 // px, the burst as it comes up
 	mawGlobAt = 26.0 // px between the globs of its acid line
+
+	splitBrood = 3   // crawlers that come out of a dead splitter
+	splitHP    = 2   // and their HP (a crawler has 4)
+	shieldArc  = 1.1 // radians either side of its heading the shield covers
+	shieldTurn = 1.3 // radians per second it turns toward the player
+	shieldBash = 110 // px/s, its lunge
+	nestBrood  = 3   // crawlers a nest keeps alive at most
 )
 
 // Enemy is any hostile. Pos is the feet (or, for the drone, its shadow).
@@ -106,6 +123,8 @@ type Enemy struct {
 	DeadT    float64
 	Dir      geom.Vec // brute: charge direction
 	Pattern  int      // boss: which attack comes next
+	Face     float64  // shielder: where its shield points (radians)
+	Parent   *Enemy   // the nest or splitter it came out of
 }
 
 func newEnemy(s world.Spawn, rng *rand.Rand) *Enemy {
@@ -190,6 +209,12 @@ func (g *Game) updateEnemy(e *Enemy) {
 		g.updateBoss(e, st, d, los)
 	case maw:
 		g.updateMaw(e, st, d, los)
+	case splitter:
+		g.updateCrawler(e, st, d, los)
+	case shielder:
+		g.updateShielder(e, st, d, los)
+	case nest:
+		g.updateNest(e, st)
 	}
 }
 
@@ -292,6 +317,76 @@ func (g *Game) updateBrute(e *Enemy, st enemyStats, d float64, los bool) {
 	default:
 		e.setState(stChase)
 		e.CD = st.cooldown
+	}
+}
+
+// updateShielder walks at the player behind its shield, turning it toward
+// them slowly enough to get around, and bashes up close. After a bash the
+// shield is down for a moment.
+func (g *Game) updateShielder(e *Enemy, st enemyStats, d float64, los bool) {
+	p := g.player
+	if e.State != stAttack && los {
+		diff := angleDiff(p.Pos.Sub(e.Pos).Angle(), e.Face)
+		e.Face += clamp(diff, -shieldTurn*dt, shieldTurn*dt)
+	}
+	e.FaceLeft = math.Cos(e.Face) < 0
+	switch {
+	case e.State != stAttack:
+		g.walk(e, st.speed, d, los)
+		if d < 26 && e.CD <= 0 {
+			e.setState(stAttack)
+		}
+	case e.T < st.fireAt: // bracing
+	case e.T < st.fireAt+0.18: // the bash
+		e.Pos = g.lvl.MoveAndSlide(e.Pos, geom.FromAngle(e.Face).Scale(shieldBash*dt), 4, 3, false)
+		if !e.Fired && e.Pos.Dist(p.Pos) < 18 {
+			e.Fired = true
+			g.hurtPlayer(2, e.Pos)
+		}
+	case e.T >= st.attackLen:
+		e.setState(stChase)
+		e.CD = st.cooldown
+	}
+}
+
+// shieldUp is whether a shielder's shield is raised (it drops after a bash).
+func (e *Enemy) shieldUp() bool {
+	return e.Kind == shielder && e.State != stDead && !(e.State == stAttack && e.T >= stats[shielder].fireAt)
+}
+
+// blocks reports whether e's shield stops a shot travelling with velocity v.
+func (e *Enemy) blocks(v geom.Vec) bool {
+	return e.shieldUp() && math.Abs(angleDiff(v.Scale(-1).Angle(), e.Face)) < shieldArc
+}
+
+// updateNest births a crawler every so often once awake, keeping at most
+// nestBrood of its own alive.
+func (g *Game) updateNest(e *Enemy, st enemyStats) {
+	switch e.State {
+	case stAttack:
+		if !e.Fired && e.T >= st.fireAt {
+			e.Fired = true
+			pos := e.Pos.Add(geom.FromAngle(g.rng.Float64() * 2 * math.Pi).Scale(12))
+			if g.lvl.RectBlocked(pos, 4, 3, false) {
+				pos = e.Pos
+			}
+			g.spawnHunter('C', pos).Parent = e
+			g.sound("spit", e.Pos)
+		}
+		if e.T >= st.attackLen {
+			e.setState(stChase)
+		}
+	default:
+		brood := 0
+		for _, o := range g.enemies {
+			if o.Parent == e && o.State != stDead {
+				brood++
+			}
+		}
+		if e.CD <= 0 && brood < nestBrood {
+			e.setState(stAttack)
+			e.CD = st.cooldown + g.rng.Float64()*0.8
+		}
 	}
 }
 
@@ -677,6 +772,7 @@ func (g *Game) kill(e *Enemy) {
 	e.setState(stDead)
 	e.DeadT = 0
 	g.kills++
+	g.lastKill = e.Pos
 	g.sound(deathSound[e.Kind], e.Pos)
 	g.maybeDrop(e)
 	switch e.Kind {
@@ -685,6 +781,16 @@ func (g *Game) kill(e *Enemy) {
 		g.shake(2, 0.15)
 	case bomber:
 		g.blast(e.Pos, bomberBlast, 3)
+	case splitter:
+		for i := 0; i < splitBrood; i++ {
+			pos := e.Pos.Add(geom.FromAngle(float64(i)*2*math.Pi/splitBrood + g.rng.Float64()).Scale(10))
+			if g.lvl.RectBlocked(pos, 4, 3, false) {
+				pos = e.Pos
+			}
+			c := g.spawnHunter('C', pos)
+			c.HP, c.CD, c.Parent = splitHP, 0.5, e
+		}
+		g.spawnFX("fx.acid_splash", e.Pos, 0)
 	case brood, warden, maw:
 		g.say(bossName[e.Kind]+" DOWN", 2.5)
 		g.stinger("victory")
@@ -704,7 +810,8 @@ func (g *Game) kill(e *Enemy) {
 }
 
 var deathSound = map[enemyKind]string{crawler: "crawler_death", spitter: "spitter_death", drone: "drone_death",
-	bomber: "explosion", brute: "brute_death", brood: "boss_death", warden: "warden_death", maw: "boss_death"}
+	bomber: "explosion", brute: "brute_death", brood: "boss_death", warden: "warden_death", maw: "boss_death",
+	splitter: "spitter_death", shielder: "brute_death", nest: "spitter_death"}
 
 // height is how far above the feet an enemy's body centre is (for aiming).
 func (e *Enemy) height() float64 {
@@ -717,6 +824,8 @@ func (e *Enemy) height() float64 {
 		return 22
 	case maw:
 		return 26
+	case shielder:
+		return 9
 	}
 	return 7
 }

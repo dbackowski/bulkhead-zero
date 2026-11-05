@@ -2,7 +2,6 @@ package game
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/dbackowski/bulkhead-zero/internal/geom"
 	"github.com/dbackowski/bulkhead-zero/internal/world"
@@ -10,21 +9,22 @@ import (
 
 // level is one deck of the station. Wave 1 is the enemies placed in the map;
 // waves lists the ones after it, which come in through the outer doors, one
-// letter per enemy (map letters: C crawler, R drone, E bomber, G brute;
-// spitters don't walk, so they stay map-only). The boss appears at the map's
+// letter per enemy (map letters: C crawler, R drone, E bomber, G brute,
+// Y splitter, U shield-bearer; spitters and nests don't walk, so they stay
+// map-only). The boss appears at the map's
 // Q after the last wave; beating it moves on to the next deck.
 type level struct {
 	name     string
 	rows     []string
 	waves    []string
 	boss     byte // M Brood Mother, W Warden, O the Maw
-	unlocked int  // weapons available when the deck starts
+	unlocked int  // guns held at the latest when the deck starts (what the guaranteed drops give by then)
 }
 
 var levels = []level{
-	{"DECK 1: HABITAT", world.Station, []string{"CCCCCCEE", "CCCCRRGEE", "CCCCCRRRGGEEE"}, 'M', 3},
-	{"DECK 2: REACTOR", world.Reactor, []string{"CCCRREE", "CCCRRGEE", "CCCCRRRGGEE"}, 'W', 6},
-	{"DECK 3: HYDROPONICS", world.Hydroponics, []string{"CCCCRREEG", "CCCCCRRGEE", "CCCCCRRRGGEEE"}, 'O', 6},
+	{"DECK 1: HABITAT", world.Station, []string{"CCCCCCEE", "CCCYRRGEE", "CCCCCRRRGGEEE", "CCYYYRRGEE"}, 'M', 2},
+	{"DECK 2: REACTOR", world.Reactor, []string{"CCCRREE", "CCURRGEE", "CCCCRRRGGEE", "CCUURRYGEE"}, 'W', 4},
+	{"DECK 3: HYDROPONICS", world.Hydroponics, []string{"CCCCRREEG", "CCCCCRRGEE", "CCCCCRRRGGEEE", "CCYYUURRE"}, 'O', 6},
 }
 
 var bossName = map[enemyKind]string{brood: "BROOD MOTHER", warden: "THE WARDEN", maw: "THE MAW"}
@@ -35,6 +35,8 @@ const (
 	waveBreak = 4.0  // seconds between waves
 	spawnGap  = 0.45 // between enemies of one wave
 	waveHeal  = 3    // HP restored after each wave
+	gunWave   = 2    // clearing this wave drops the next gun the player lacks (so does each boss)
+	heavyWave = 4    // clearing this wave drops a heavy weapon for the last wave and the boss
 	doorRange = 40.0 // px from a door's centre that opens it
 	doorTime  = 0.25 // seconds to slide fully open or shut
 )
@@ -61,6 +63,7 @@ func (g *Game) updateWaves() error {
 		case g.boss.State != stDead || g.boss.DeadT < 2.5:
 		case g.level+1 < len(levels):
 			g.level++
+			g.carried = g.unlocked + g.gunsOnFloor() // a gun left lying around comes along
 			return g.reset()
 		default:
 			g.state, g.stateT = stateClear, 0
@@ -88,9 +91,11 @@ func (g *Game) waveCleared() {
 		p.HP = playerMaxHP
 		msg = fmt.Sprintf("WAVE %d CLEARED  HEALTH RESTORED", g.wave)
 	}
-	if g.unlocked < len(g.weapons) {
-		g.unlocked++
-		msg += fmt.Sprintf("\nNEW WEAPON: %s [%d]", strings.ToUpper(g.weapons[g.unlocked-1].Name), g.unlocked)
+	if g.wave == gunWave && g.dropGun(g.lastKill) {
+		msg += "\nA WEAPON DROPPED"
+	}
+	if g.wave == heavyWave && g.dropHeavy(g.lastKill) {
+		msg += "\nA HEAVY WEAPON DROPPED"
 	}
 	g.say(msg, waveBreak)
 	g.stinger("clear")

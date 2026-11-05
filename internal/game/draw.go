@@ -82,6 +82,11 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 		op.GeoM.Translate(float64(d.TX*world.T)-cam.X, float64(d.TY*world.T)-cam.Y)
 		dst.DrawImage(g.lib.T(doorTile(d)), op)
 	}
+	for _, w := range g.wrecks {
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(w.X-cam.X, w.Y-cam.Y)
+		dst.DrawImage(g.lib.T("decal_crate_wreck"), op)
+	}
 	for _, s := range g.scorches {
 		gfx.DrawCentered(dst, g.lib.T("decal_scorch"), s.X-cam.X, s.Y-cam.Y, 0)
 	}
@@ -135,7 +140,7 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 	// projectiles and effects on top
 	for _, b := range g.bullets {
 		v := b.Ground.Sub(geom.V(0, b.H)).Sub(cam)
-		gfx.DrawCentered(dst, g.lib.A(b.Anim).Frame(g.t), v.X, v.Y, b.Rot)
+		gfx.DrawCentered(dst, g.lib.A(b.Anim).Frame(b.Age), v.X, v.Y, b.Rot)
 	}
 	for _, s := range g.shots {
 		v := s.Ground.Sub(geom.V(0, s.H)).Sub(cam)
@@ -159,11 +164,12 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 }
 
 var enemyAnim = map[enemyKind]string{crawler: "crawler", spitter: "spitter", drone: "drone",
-	bomber: "bomber", brute: "brute", brood: "brood", warden: "warden", maw: "maw"}
+	bomber: "bomber", brute: "brute", brood: "brood", warden: "warden", maw: "maw",
+	splitter: "splitter", shielder: "shielder", nest: "nest"}
 
 func (g *Game) drawEnemy(dst *ebiten.Image, e *Enemy, cam geom.Vec) {
 	// side-on enemies only have *_right frames, mirrored for left
-	side := e.Kind == crawler || e.Kind == bomber || e.Kind == brute
+	side := e.Kind == crawler || e.Kind == bomber || e.Kind == brute || e.Kind == splitter || e.Kind == shielder
 	name, t := enemyAnim[e.Kind], e.AnimT
 	switch {
 	case e.State == stDead:
@@ -179,9 +185,9 @@ func (g *Game) drawEnemy(dst *ebiten.Image, e *Enemy, cam geom.Vec) {
 	}
 	a := g.lib.A(name)
 	img := a.Frame(t)
-	if e.Kind == brute && e.State == stAttack { // frames 0-1 wind-up, 2-3 charge
+	if (e.Kind == brute || e.Kind == shielder) && e.State == stAttack { // frames 0-1 wind-up, 2-3 charge or bash
 		i := int(e.T*10) % 2
-		if e.T >= stats[brute].fireAt {
+		if e.T >= stats[e.Kind].fireAt {
 			i += 2
 		}
 		img = a.Frames[i]
@@ -194,7 +200,33 @@ func (g *Game) drawEnemy(dst *ebiten.Image, e *Enemy, cam geom.Vec) {
 		g.drawBurrow(dst, e, img, cam)
 		return
 	}
+	if e.Kind != shielder || e.State == stDead {
+		gfx.DrawAtFeet(dst, img, e.Pos.X-cam.X, e.Pos.Y-cam.Y, o)
+		return
+	}
+	behind := math.Sin(e.Face) < -0.35 // pointing away from the camera
+	if behind {
+		g.drawShield(dst, e, cam, o)
+	}
 	gfx.DrawAtFeet(dst, img, e.Pos.X-cam.X, e.Pos.Y-cam.Y, o)
+	if !behind {
+		g.drawShield(dst, e, cam, o)
+	}
+}
+
+// drawShield rotates the shield plate around the shielder toward its heading,
+// or swings it aside while it is down after a bash.
+func (g *Game) drawShield(dst *ebiten.Image, e *Enemy, cam geom.Vec, o gfx.SpriteOpts) {
+	a, off := e.Face, 7.0
+	if !e.shieldUp() {
+		a, off = e.Face+1.3, 5
+	}
+	at := e.Pos.Sub(geom.V(0, 8)).Add(geom.FromAngle(a).Scale(off)).Sub(cam)
+	var m ebiten.GeoM
+	m.Translate(-12, -12)
+	m.Rotate(a)
+	m.Translate(math.Round(at.X), math.Round(at.Y))
+	gfx.DrawWithGeoM(dst, g.lib.A("shielder.shield").Frames[0], m, gfx.SpriteOpts{Flash: o.Flash})
 }
 
 // drawBurrow draws the Maw underground: a dirt mound that moves with it, the

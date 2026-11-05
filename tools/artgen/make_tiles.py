@@ -393,6 +393,21 @@ def decal_scorch():
     return img
 
 
+def decal_crate_wreck():
+    """What's left of a crate: bent plates and the amber latch, flat on the floor."""
+    img = new()
+    rect(img, 3, 13, 21, 20, (0, 0, 0, 70))                        # soot and dust
+    for x0, y0, x1, y1 in ((3, 14, 9, 17), (12, 16, 19, 19), (8, 10, 13, 12), (16, 11, 20, 13)):
+        bevel(img, x0, y0, x1, y1, "rust", (170, 110, 70, 255), (70, 40, 26, 255))
+    for i in range(6):                                               # a snapped brace
+        px(img, 4 + i, 18 - i // 2, (90, 52, 32, 255))
+    rect(img, 13, 13, 15, 14, "amber")
+    px(img, 14, 14, "amber_d")
+    for x, y in ((2, 11), (21, 15), (10, 20), (18, 9), (6, 9)):
+        px(img, x, y, (120, 70, 44, 255))
+    return img
+
+
 def decal_cables():
     img = new()
     import math
@@ -485,6 +500,7 @@ def build_tiles():
     for c in ("NE", "NW", "SE", "SW"):
         tiles.append((f"wall_inner_{c}", wall_inner_corner(c)))
     tiles.append(("floor_soil", floor_soil()))  # appended: earlier indexes stay put
+    tiles.append(("decal_crate_wreck", decal_crate_wreck()))
     return tiles
 
 

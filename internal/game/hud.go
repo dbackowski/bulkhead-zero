@@ -58,7 +58,7 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(58, ScreenH-19)
 	dst.DrawImage(w.Img, op)
-	f.Draw(dst, fmt.Sprint(p.Slot+1), 86, ScreenH-16, 1, textAmber)
+	f.Draw(dst, fmt.Sprint(g.key(p.Slot)), 86, ScreenH-16, 1, textAmber)
 	f.Draw(dst, w.Name, 94, ScreenH-16, 1, textWhite)
 	ammo, ammoClr := fmt.Sprintf("%d/%d", p.Mag[p.Slot], p.Spare[p.Slot]), color.Color(textWhite)
 	switch {
@@ -66,6 +66,8 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 		ammo, ammoClr = "RELOAD", textAmber
 		k := 1 - p.ReloadT/(w.ReloadMS/1000)
 		vector.FillRect(dst, 172, ScreenH-7, float32(40*k), 1, textAmber, false)
+	case w.Heavy:
+		ammo, ammoClr = fmt.Sprint(p.Mag[p.Slot]), textAmber // all it has left
 	case p.Mag[p.Slot] == 0 && !g.canReload(p.Slot):
 		ammo, ammoClr = "EMPTY", textRed
 	case w.Ammo == 0:
@@ -113,7 +115,7 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 	switch g.state {
 	case statePlaying:
 		if g.t < 7 && g.bannerT <= 0 && !g.wheel.open {
-			g.printCentered(dst, "WASD MOVE   MOUSE AIM   LMB FIRE   R RELOAD\n1-6 / HOLD Q / WHEEL WEAPON   ESC PAUSE", 40, nil)
+			g.printCentered(dst, "WASD MOVE   MOUSE AIM   LMB FIRE   R RELOAD\n1-7 / HOLD Q / WHEEL WEAPON   ESC PAUSE", 40, nil)
 		}
 	case statePaused:
 		vector.FillRect(dst, 0, 0, ScreenW, ScreenH, dimScreen, false)

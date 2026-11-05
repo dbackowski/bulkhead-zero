@@ -19,10 +19,15 @@ const (
 	invulnTime   = 0.45
 )
 
-// Slot order for keys 1-6. The first three are there from the start; each
-// cleared wave unlocks the next. Code that needs a particular gun looks it up
+// Slot order for keys 1-6. Pistol and rifle are there from the start; the
+// rest unlock in this order by picking up dropped guns (see dropGun). Code that needs a particular gun looks it up
 // with slotOf rather than by number.
 var weaponOrder = []string{"pistol", "rifle", "shotgun", "smg", "plasma", "launcher"}
+
+// Heavy weapons follow the guns in Game.weapons. They are found rarely (see
+// dropHeavy), one is carried at a time on key 7, they can't be reloaded and
+// are thrown away when empty, and they don't come along to the next deck.
+var heavyOrder = []string{"minigun", "flamethrower"}
 
 const startWeapon = "rifle" // the gun in hand when a deck starts
 
@@ -50,10 +55,13 @@ type Player struct {
 	Mag       []int   // rounds loaded, per weapon slot
 	Spare     []int   // spare rounds, per slot (unused for unlimited weapons)
 	ReloadT   float64 // time left on the current reload; 0 = not reloading
+	Heavy     int     // slot of the heavy weapon carried, -1 for none
+	LastGun   int     // the gun (not heavy) last in hand, to go back to when a heavy runs dry
+	Spin      float64 // minigun barrels: 0 still, 1 up to speed
 }
 
 func newPlayer(pos geom.Vec, weapons []*gfx.Weapon) *Player {
-	p := &Player{Pos: pos, HP: playerMaxHP, Facing: "right", HurtT: 99, SinceShot: 99}
+	p := &Player{Pos: pos, HP: playerMaxHP, Facing: "right", HurtT: 99, SinceShot: 99, Heavy: -1}
 	for _, w := range weapons {
 		p.Mag = append(p.Mag, w.Mag)
 		p.Spare = append(p.Spare, w.Ammo)
@@ -64,8 +72,28 @@ func newPlayer(pos geom.Vec, weapons []*gfx.Weapon) *Player {
 // canReload reports whether slot i has a partly empty magazine and rounds to fill it.
 func (g *Game) canReload(i int) bool {
 	w, p := g.weapons[i], g.player
-	return p.Mag[i] < w.Mag && (w.Ammo == 0 || p.Spare[i] > 0)
+	return !w.Heavy && p.Mag[i] < w.Mag && (w.Ammo == 0 || p.Spare[i] > 0)
 }
+
+// holds reports whether the player can switch to slot.
+func (g *Game) holds(slot int) bool {
+	return slot >= 0 && slot < g.unlocked || slot >= g.guns && slot == g.player.Heavy
+}
+
+// held lists the slots the player can switch to, in key order.
+func (g *Game) held() []int {
+	var s []int
+	for i := 0; i < g.unlocked; i++ {
+		s = append(s, i)
+	}
+	if g.player.Heavy >= 0 {
+		s = append(s, g.player.Heavy)
+	}
+	return s
+}
+
+// key is the number key for a slot (every heavy is on the one after the guns).
+func (g *Game) key(slot int) int { return min(slot, g.guns) + 1 }
 
 func (g *Game) startReload() {
 	p := g.player
@@ -157,14 +185,18 @@ func (g *Game) updatePlayer(in Input) {
 
 	// weapons
 	slot := p.Slot
-	if in.SelectSlot >= 0 && in.SelectSlot < g.unlocked {
+	if g.holds(in.SelectSlot) {
 		slot = in.SelectSlot
 	}
 	if in.Cycle != 0 {
-		slot = (slot + in.Cycle + g.unlocked) % g.unlocked
+		h := g.held()
+		slot = h[(slices.Index(h, slot)+in.Cycle+len(h))%len(h)]
 	}
 	if slot != p.Slot {
-		p.Slot, p.ReloadT = slot, 0 // switching drops the reload
+		p.Slot, p.ReloadT, p.Spin = slot, 0, 0 // switching drops the reload
+	}
+	if p.Slot < g.guns {
+		p.LastGun = p.Slot
 	}
 	if p.ReloadT > 0 {
 		if p.ReloadT -= dt; p.ReloadT <= 0 {
@@ -176,10 +208,27 @@ func (g *Game) updatePlayer(in Input) {
 		g.startReload()
 	}
 
-	// movement
+	w := g.weapons[p.Slot]
+	trigger := in.Fire
+	if w.SemiAuto {
+		trigger = in.FirePressed
+	}
+	if w.SpinMS > 0 { // the minigun spins up while the trigger is held
+		k := dt / (w.SpinMS / 1000)
+		if !trigger {
+			k = -2 * k
+		}
+		p.Spin = clamp(p.Spin+k, 0, 1)
+	}
+
+	// movement (slower while firing a heavy gun)
 	move := in.Move.Norm()
 	p.Moving = move.Len() > 0
-	p.Vel = move.Scale(playerSpeed)
+	speed := playerSpeed
+	if w.MoveMul > 0 && trigger {
+		speed *= w.MoveMul
+	}
+	p.Vel = move.Scale(speed)
 	if p.Moving {
 		p.AnimT += dt
 		p.Pos = g.lvl.MoveAndSlide(p.Pos, p.Vel.Scale(dt), playerHW, playerHH, false)
@@ -196,16 +245,15 @@ func (g *Game) updatePlayer(in Input) {
 	p.Facing = facingFor(g.lib.Facings, p.Aim)
 
 	// fire
-	w := g.weapons[p.Slot]
-	trigger := in.Fire
-	if w.SemiAuto {
-		trigger = in.FirePressed
-	}
 	switch {
-	case !trigger || p.FireCD > 0 || p.ReloadT > 0:
+	case !trigger || p.FireCD > 0 || p.ReloadT > 0 || w.SpinMS > 0 && p.Spin < 1:
 	case p.Mag[p.Slot] > 0:
 		g.fire(w)
 		p.Mag[p.Slot]--
+		if w.Heavy && p.Mag[p.Slot] == 0 { // spent: throw it away
+			g.say(strings.ToUpper(w.Name)+" EMPTY", 1.5)
+			p.Heavy, p.Slot, p.Spin = -1, p.LastGun, 0
+		}
 	default: // empty and nothing to reload with
 		g.sound("dry_fire", p.Pos)
 		p.FireCD = 0.3
@@ -224,6 +272,9 @@ func (g *Game) fire(w *gfx.Weapon) {
 		a := p.Aim
 		speed := w.BulletSpeed
 		life := 0.9 // the launcher's grenade bursts at the end of this
+		if w.LifeMS > 0 {
+			life = w.LifeMS / 1000
+		}
 		if w.Pellets > 1 {
 			a += -spread + 2*spread*float64(i)/float64(w.Pellets-1) + (g.rng.Float64()*2-1)*0.04
 			speed *= 0.9 + g.rng.Float64()*0.2
@@ -241,7 +292,14 @@ func (g *Game) fire(w *gfx.Weapon) {
 			Anim:   w.Projectile,
 			Pierce: w.Pierce,
 			Blast:  w.Blast,
+			Flame:  w.Flame,
 		})
+	}
+	if w.Flame {
+		if p.Mag[p.Slot]%6 == 0 { // one roar covers several puffs
+			g.sound(w.Name, muzzle)
+		}
+		return
 	}
 	g.spawnFX("fx.muzzle_flash", muzzle, 0)
 	g.sound(w.Name, muzzle)

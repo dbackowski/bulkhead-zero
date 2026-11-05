@@ -310,6 +310,66 @@
         "frames": 4,
         "frame_ms": 130,
         "loop": false
+      },
+      "splitter.walk_right": {
+        "row": 15,
+        "frames": 4,
+        "frame_ms": 110,
+        "loop": true
+      },
+      "splitter.attack_right": {
+        "row": 16,
+        "frames": 4,
+        "frame_ms": 90,
+        "loop": false
+      },
+      "splitter.death": {
+        "row": 17,
+        "frames": 4,
+        "frame_ms": 130,
+        "loop": false
+      },
+      "shielder.walk_right": {
+        "row": 18,
+        "frames": 4,
+        "frame_ms": 110,
+        "loop": true
+      },
+      "shielder.attack_right": {
+        "row": 19,
+        "frames": 4,
+        "frame_ms": 90,
+        "loop": false
+      },
+      "shielder.shield": {
+        "row": 20,
+        "frames": 1,
+        "frame_ms": 100,
+        "loop": true
+      },
+      "shielder.death": {
+        "row": 21,
+        "frames": 4,
+        "frame_ms": 130,
+        "loop": false
+      },
+      "nest.idle": {
+        "row": 22,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true
+      },
+      "nest.attack": {
+        "row": 23,
+        "frames": 4,
+        "frame_ms": 90,
+        "loop": false
+      },
+      "nest.death": {
+        "row": 24,
+        "frames": 4,
+        "frame_ms": 130,
+        "loop": false
       }
     },
     "fx.png": {
@@ -367,28 +427,40 @@
         "frame_ms": 70,
         "loop": false
       },
-      "muzzle_flash": {
+      "debris": {
         "row": 9,
+        "frames": 5,
+        "frame_ms": 70,
+        "loop": true
+      },
+      "muzzle_flash": {
+        "row": 10,
         "frames": 3,
         "frame_ms": 40,
         "loop": false
       },
       "crosshair": {
-        "row": 10,
+        "row": 11,
         "frames": 2,
         "frame_ms": 300,
         "loop": true
       },
       "pickup_health": {
-        "row": 11,
+        "row": 12,
         "frames": 4,
         "frame_ms": 250,
         "loop": true
       },
       "pickup_ammo": {
-        "row": 12,
+        "row": 13,
         "frames": 4,
         "frame_ms": 250,
+        "loop": true
+      },
+      "flame": {
+        "row": 14,
+        "frames": 5,
+        "frame_ms": 76,
         "loop": true
       }
     },
@@ -614,6 +686,60 @@
       "mag": 4,
       "reload_ms": 1600,
       "ammo": 12
+    },
+    "minigun": {
+      "rect": [
+        0,
+        72,
+        24,
+        12
+      ],
+      "pivot": [
+        5,
+        7
+      ],
+      "muzzle": [
+        23,
+        6
+      ],
+      "fire_ms": 45,
+      "spread_deg": 6,
+      "pellets": 1,
+      "recoil_px": 1,
+      "bullet_speed": 440,
+      "damage": 1,
+      "mag": 160,
+      "heavy": true,
+      "spin_ms": 400,
+      "move_mul": 0.55
+    },
+    "flamethrower": {
+      "rect": [
+        0,
+        84,
+        24,
+        12
+      ],
+      "pivot": [
+        9,
+        7
+      ],
+      "muzzle": [
+        21,
+        6
+      ],
+      "fire_ms": 40,
+      "spread_deg": 9,
+      "pellets": 1,
+      "recoil_px": 0,
+      "bullet_speed": 190,
+      "damage": 1,
+      "mag": 110,
+      "heavy": true,
+      "projectile": "flame",
+      "pierce": 99,
+      "life_ms": 380,
+      "flame": true
     }
   },
   "font.png": {

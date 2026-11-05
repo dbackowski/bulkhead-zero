@@ -1,10 +1,12 @@
 package game
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 
 	"github.com/dbackowski/bulkhead-zero/internal/geom"
+	"github.com/dbackowski/bulkhead-zero/internal/world"
 )
 
 // Plays the level with the autopilot, without a window, and checks the round
@@ -17,7 +19,7 @@ func TestAutopilotRound(t *testing.T) {
 	}
 	g.autopilot = newAutopilot()
 	start := g.aliveFoes()
-	for i := 0; i < 60*720 && g.state == statePlaying; i++ { // every deck in a row: allow ~12 minutes
+	for i := 0; i < 60*900 && g.state == statePlaying; i++ { // every deck in a row: allow ~15 minutes
 		if err := g.Update(); err != nil {
 			t.Fatal(err)
 		}
@@ -53,6 +55,37 @@ func TestDeathAndRestart(t *testing.T) {
 	}
 	if g.player.HP != playerMaxHP || g.aliveFoes() != g.totalFoes || g.state != statePlaying {
 		t.Fatal("restart did not restore the round")
+	}
+}
+
+// Shooting a crate wears it down until it breaks: the tile is free to walk
+// through and a wreck is left on the floor. Consoles can't be broken.
+func TestCrateBreaks(t *testing.T) {
+	g, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var crate, console *world.Prop
+	for _, p := range g.lvl.Props {
+		switch {
+		case p.Name == "crate" && crate == nil:
+			crate = p
+		case p.Name == "console" && console == nil:
+			console = p
+		}
+	}
+	g.damageProp(crate, crate.HP-1)
+	if !crate.Alive {
+		t.Fatal("the crate broke before its HP ran out")
+	}
+	g.damageProp(crate, 1)
+	if crate.Alive || g.lvl.RectBlocked(crate.Center(), 4, 3, false) || len(g.wrecks) != 1 {
+		t.Fatalf("broken crate: alive=%v, still blocking=%v, wrecks=%d",
+			crate.Alive, g.lvl.RectBlocked(crate.Center(), 4, 3, false), len(g.wrecks))
+	}
+	g.damageProp(console, 99)
+	if !console.Alive {
+		t.Fatal("a console broke")
 	}
 }
 
@@ -128,8 +161,8 @@ func checkDifficulty(t *testing.T, lvl int) {
 	}
 }
 
-// Killing everything walks through every wave of every deck (unlocking
-// weapons and healing between waves) to its boss; beating a boss starts the
+// Killing everything walks through every wave of every deck (dropping guns
+// and healing between waves) to its boss; beating a boss starts the
 // next deck, and beating the last one clears the station.
 func TestWavesThenBoss(t *testing.T) {
 	g, err := New()
@@ -145,9 +178,11 @@ func TestWavesThenBoss(t *testing.T) {
 		}
 	}
 	killAll := func() {
-		for _, e := range g.enemies {
-			if e.State != stDead {
-				g.kill(e)
+		for g.aliveFoes() > 0 { // again for what a splitter leaves behind
+			for _, e := range g.enemies {
+				if e.State != stDead {
+					g.kill(e)
+				}
 			}
 		}
 	}
@@ -161,8 +196,12 @@ func TestWavesThenBoss(t *testing.T) {
 			}
 			killAll()
 			step(waveBreak + 0.1)
-			if want := min(deck.unlocked+w, len(g.weapons)); g.unlocked != want {
-				t.Fatalf("deck %d after wave %d: %d weapons unlocked, want %d", lvl+1, w, g.unlocked, want)
+			want := deck.unlocked
+			if w >= gunWave {
+				want++
+			}
+			if got := g.unlocked + g.gunsOnFloor(); got < min(want, g.guns) {
+				t.Fatalf("deck %d after wave %d: %d weapons held or dropped, want %d", lvl+1, w, got, want)
 			}
 			step(spawnGap * 20) // let the next wave come in through the doors
 			if w < g.waveCount() && g.aliveFoes() != len(deck.waves[w-1]) {
@@ -302,5 +341,163 @@ func TestAutopilotDoesNotGetStuck(t *testing.T) {
 	t.Logf("stuck %d s of %.0f s played", stuck, played)
 	if float64(stuck) > played*0.02 {
 		t.Errorf("the bot was stuck %d s of %.0f s", stuck, played)
+	}
+}
+
+// Guns drop in order, never time out, can only be picked up in order, come
+// along to the next deck if left lying around, and survive a retry but not a
+// fresh start.
+func TestGunDrops(t *testing.T) {
+	g, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := g.player
+	if g.unlocked != 2 {
+		t.Fatalf("deck 1 starts with %d guns, want pistol and rifle", g.unlocked)
+	}
+	far := p.Pos.Add(geom.V(200, 0))
+	g.dropGun(far)
+	g.dropGun(far)
+	if g.pickups[0].Slot != 2 || g.pickups[1].Slot != 3 {
+		t.Fatalf("dropped slots %d and %d, want 2 and 3", g.pickups[0].Slot, g.pickups[1].Slot)
+	}
+	g.pickups[1].Pos = p.Pos
+	for i := 0; i < int(pickupLife*60)+2; i++ {
+		g.updatePickups()
+	}
+	if len(g.pickups) != 2 || g.unlocked != 2 {
+		t.Fatalf("%d guns on the floor and %d held: the later one was taken first or one timed out", len(g.pickups), g.unlocked)
+	}
+	g.pickups[0].Pos = p.Pos
+	g.updatePickups()
+	g.updatePickups()
+	if g.unlocked != 4 || len(g.pickups) != 0 {
+		t.Fatalf("%d guns held, %d on the floor, want 4 and 0", g.unlocked, len(g.pickups))
+	}
+
+	g.unlocked = 5
+	g.dropGun(far)
+	g.carried = g.unlocked + g.gunsOnFloor()
+	g.level = 1
+	if err := g.reset(); err != nil {
+		t.Fatal(err)
+	}
+	if g.unlocked != 6 {
+		t.Fatalf("deck 2 starts with %d guns, want the 6 found", g.unlocked)
+	}
+	if g.reset(); g.unlocked != 6 {
+		t.Fatalf("a retry starts with %d guns, want 6", g.unlocked)
+	}
+	g.state = stateClear
+	if err := g.step(Input{Restart: true}); err != nil {
+		t.Fatal(err)
+	}
+	if g.level != 0 || g.unlocked != 2 {
+		t.Fatalf("a fresh start is on deck %d with %d guns", g.level+1, g.unlocked)
+	}
+}
+
+// A shield-bearer's shield stops bullets from the front but not from behind,
+// a splitter leaves small crawlers, and a nest keeps at most nestBrood of
+// its own crawlers alive.
+func TestNewEnemies(t *testing.T) {
+	g, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.enemies = nil
+	p := g.player.Pos
+	s := g.spawnHunter('U', p.Add(geom.V(60, 0)))
+	s.Face = math.Pi // shield toward the player, on its left
+	shoot := func(from geom.Vec) {
+		g.bullets = []*Bullet{{Ground: from, Vel: s.Pos.Sub(from).Norm().Scale(400), Life: 1, Dmg: 1, Anim: "fx.bullet"}}
+		for i := 0; i < 30 && len(g.bullets) > 0; i++ {
+			g.updateBullets()
+		}
+	}
+	if shoot(s.Pos.Add(geom.V(-30, 0))); s.HP != stats[shielder].hp {
+		t.Fatalf("a shot at the shield did damage: HP %d", s.HP)
+	}
+	if shoot(s.Pos.Add(geom.V(30, 0))); s.HP != stats[shielder].hp-1 {
+		t.Fatalf("a shot in the back did no damage: HP %d", s.HP)
+	}
+
+	g.enemies = nil
+	g.kill(g.spawnHunter('Y', p.Add(geom.V(60, 0))))
+	if n := g.aliveFoes(); n != splitBrood {
+		t.Fatalf("a dead splitter left %d crawlers, want %d", n, splitBrood)
+	}
+
+	g.enemies = nil
+	n := g.spawnHunter('N', p.Add(geom.V(60, 0)))
+	for i := 0; i < 60*20; i++ {
+		g.player.Invuln = 1
+		g.updateEnemy(n)
+	}
+	if got := g.aliveFoes() - 1; got != nestBrood {
+		t.Fatalf("the nest has %d crawlers out, want %d", got, nestBrood)
+	}
+}
+
+// A heavy weapon goes straight into the hands, can't be reloaded or refilled
+// by ammo, the minigun only fires once spun up, an empty one is thrown away
+// for the gun held before, and none comes along to the next deck.
+func TestHeavyWeapons(t *testing.T) {
+	g, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.enemies = nil
+	p := g.player
+	rifle, minigun := g.slotOf("rifle"), g.slotOf("minigun")
+	g.pickups = []*Pickup{{Kind: pickHeavy, Slot: minigun, Pos: p.Pos}}
+	g.updatePickups()
+	if p.Heavy != minigun || p.Slot != minigun || g.key(minigun) != 7 {
+		t.Fatalf("picked up the minigun: heavy %d, in hand %d", p.Heavy, p.Slot)
+	}
+	fire := Input{SelectSlot: -1, Fire: true, Mouse: geom.V(ScreenW/2+60, ScreenH/2)}
+	for i := 0; i < 15; i++ { // a quarter second: still spinning up
+		if err := g.step(fire); err != nil {
+			t.Fatal(err)
+		}
+	}
+	full := g.weapons[minigun].Mag
+	if p.Mag[minigun] != full {
+		t.Fatalf("the minigun fired before it spun up (%d of %d left)", p.Mag[minigun], full)
+	}
+	for i := 0; i < 30; i++ {
+		if err := g.step(fire); err != nil {
+			t.Fatal(err)
+		}
+	}
+	left := p.Mag[minigun]
+	if left == full {
+		t.Fatal("the minigun never fired")
+	}
+	g.collect(&Pickup{Kind: pickAmmo})
+	if g.startReload(); p.Mag[minigun] != left || p.ReloadT != 0 {
+		t.Fatal("a heavy weapon was refilled or reloaded")
+	}
+	for i := 0; i < 60*20 && p.Heavy >= 0; i++ {
+		if err := g.step(fire); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if p.Heavy != -1 || p.Slot != rifle {
+		t.Fatalf("after running dry: heavy %d, in hand %d, want none and the rifle", p.Heavy, p.Slot)
+	}
+
+	g.pickups = []*Pickup{{Kind: pickHeavy, Slot: g.slotOf("flamethrower"), Pos: p.Pos}}
+	g.updatePickups()
+	g.level = 1
+	if err := g.reset(); err != nil {
+		t.Fatal(err)
+	}
+	if g.player.Heavy != -1 {
+		t.Fatal("a heavy weapon came along to the next deck")
+	}
+	if !g.dropHeavy(g.player.Pos) || g.dropHeavy(g.player.Pos) {
+		t.Fatal("dropHeavy should leave one heavy weapon on the floor at a time")
 	}
 }

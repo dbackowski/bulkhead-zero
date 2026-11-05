@@ -45,6 +45,7 @@ func TestWeaponWheel(t *testing.T) {
 		t.Fatal(err)
 	}
 	g.enemies = nil
+	g.unlocked = 3 // through the shotgun
 	mouse := geom.V(300, 120)
 	step := func(in Input) Input {
 		in.SelectSlot = -1
@@ -52,7 +53,7 @@ func TestWeaponWheel(t *testing.T) {
 		return g.updateWheel(in)
 	}
 	shotgun := g.slotOf("shotgun")
-	dir := wheelSlotPos(shotgun, len(g.weapons)).Sub(geom.V(ScreenW/2, ScreenH/2)).Norm().Scale(40)
+	dir := wheelSlotPos(shotgun, g.wheelSpots()).Sub(geom.V(ScreenW/2, ScreenH/2)).Norm().Scale(40)
 	step(Input{WheelHeld: true})
 	in := step(Input{WheelHeld: true, Fire: true, Mouse: dir})
 	if !g.wheel.open || in.Fire || in.Mouse != mouse {
@@ -67,7 +68,7 @@ func TestWeaponWheel(t *testing.T) {
 	}
 	// pointing at a locked gun does nothing
 	locked := g.slotOf("launcher")
-	dir = wheelSlotPos(locked, len(g.weapons)).Sub(geom.V(ScreenW/2, ScreenH/2)).Norm().Scale(40)
+	dir = wheelSlotPos(locked, g.wheelSpots()).Sub(geom.V(ScreenW/2, ScreenH/2)).Norm().Scale(40)
 	step(Input{WheelHeld: true})
 	step(Input{WheelHeld: true, Mouse: dir})
 	if in = step(Input{Mouse: dir}); in.SelectSlot != -1 {
