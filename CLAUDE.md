@@ -311,9 +311,14 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   `BZ_RECORD=dir BZ_RECORD_SECONDS=30` saves every 3rd frame as PNG and then quits;
   `BZ_DECK=2` starts on that deck (also handy to practise a boss).
   The bot steps off the Maw's marker after its reaction time.
-  `docs/previews/gameplay.gif` was made that way: clips of the deck 1 opening, the bot
-  using the weapon wheel, a wave coming in, the Brood Mother and the Warden, picked from
-  two recorded bot runs.
+  `docs/previews/gameplay.gif` was made that way (November 2026): one 230 s
+  `BZ_AUTOPILOT=1` recording per deck (`BZ_DECK=1..3`), with a temporary `println` of
+  the frame number (`recorder.saved`) at events worth showing (a splitter bursting, a
+  shot blocked by a shield, a nest birth, heavy weapon fire, a boss appearing) to find the
+  clips, then 7 clips (530 frames, 20 fps, one shared 255-colour palette, ~9.6 MB) joined
+  with Pillow: the deck 1 opening, the minigun among splitters (ending on the weapon
+  wheel), shots off shield-bearers, the minigun on a nest, and the flamethrower on each
+  boss.
 - **Tests:** world parsing/connectivity (every spawn reachable), autotile vs the Python
   golden data, collision, line of sight, flow-field following, metadata completeness,
   facing sectors, doors, the wave → boss → clear flow, reloading, pickups, gun drops, music choice, and full rounds
