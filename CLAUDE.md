@@ -249,11 +249,13 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   dropped. Wired so far: weapon shots (named like the weapon; the flamethrower's roar
   plays every 6th puff) and bullet hits: `hit_flesh`
   (crawler, spitter), `hit_metal` (drone, explosive barrel), `hit_wall` (walls, other props),
+  `shield_block` (a shot stopped by a shield-bearer: a heavy ring and a ricochet whine),
   `hurt` / `player_death`, `<kind>_death` per enemy (`deathSound` in `enemy.go`), `explosion`
   (barrels, bombers, grenades), `door`, `boss_roar`, `pickup`, `reload`, `dry_fire`, and
   enemy attacks: `laser` (drone fires),
   `spit` and `acid_splash` (spitter glob), `spine` (boss ring), `burrow` (the Maw appears or
-  digs in).
+  digs in), `nest_birth` (a nest pushes out a crawler). The splitter, shield-bearer and
+  nest each have their own death sound (`splitter_death`, `shielder_death`, `nest_death`).
   `hurt` and `player_death` are a voice made by source-filter synthesis (`voice()` in make_sfx.py). `BZ_MUTE=1`
   or running under `go test` skips audio entirely (no audio context is created).
 - **Music** (`sfx.go`, `musicTrack`/`updateMusic`): three loops, `calm` (exploring, between

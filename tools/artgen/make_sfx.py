@@ -497,6 +497,56 @@ def flamethrower(rng, v):
     return finish(drive(s, 1.6), fade=0.08)
 
 
+def shield_block(rng, v):
+    """A bullet glancing off a riot shield: a heavier, longer ring than
+    hit_metal (a big plate) plus a falling ricochet whine."""
+    n = int(0.4 * RATE)
+    k = 1 + 0.06 * (v - 1)
+    ring = mix(*[scale(tone(n, f * k, d, rng), a) for f, d, a in
+                 ((430, 0.14, 0.5), (1190, 0.08, 0.35), (2330, 0.05, 0.25), (3870, 0.02, 0.15))])
+    tick = scale(env(biquad(noise(rng, n), "hp", 3500), 0.003), 0.9)
+    whine = scale(delayed(tone(n, sweep(4200 - 300 * v, 1700, 0.08), 0.1), 0.01), 0.22)
+    return finish(reverb(mix(ring, tick, whine), 0.18, size=0.7), fade=0.05)
+
+
+def splitter_death(rng, v):
+    """The sac tears with a wet pop, gurgles, and three small crawlers squeal out."""
+    n = int(0.8 * RATE)
+    pop = env(biquad(noise(rng, n), "lp", sweep(3200, 300, 0.04), q=1.4), 0.08)
+    gurgle = scale(bubbles(rng, n, 18, 300, 900, 0.5), 0.5)
+    squeals = mix(*[scale(delayed(fm(n, sweep(2300 + 160 * j + 60 * v, 1500, 0.07), 61 + 7 * j, 0.3, 0.05),
+                                  0.12 + 0.09 * j), 0.4) for j in range(3)])
+    return finish(drive(mix(pop, gurgle, biquad(squeals, "bp", 1900, q=0.7)), 1.6), fade=0.06)
+
+
+def shielder_death(rng, v):
+    """A choked groan, then the shield and armour clatter to the floor."""
+    n = int(1.0 * RATE)
+    groan = biquad(fm(n, sweep(320 + 20 * v, 110, 0.25), 19 + 2 * v, 0.5, 0.25), "lp", 1200)
+    clatter = mix(*[delayed(scale(mix(tone(n, f, 0.06, rng), scale(tone(n, f * 2.7, 0.03, rng), 0.5)), a), t)
+                    for f, a, t in ((610 + 20 * v, 0.5, 0.32), (840, 0.35, 0.42), (560, 0.3, 0.53), (720, 0.2, 0.6))])
+    thud = delayed(boom(rng, n, 0.03, 0.08, 0.6, 1.6), 0.3)
+    return finish(reverb(drive(mix(scale(groan, 1.2), clatter, scale(thud, 0.6)), 1.5), 0.15, size=0.8), fade=0.08)
+
+
+def nest_death(rng, v):
+    """The hive collapses: a deep wet groan, a heavy splat and lots of bubbling."""
+    n = int(1.3 * RATE)
+    groan = biquad(fm(n, sweep(180 + 15 * v, 55, 0.4), 11 + v, 0.6, 0.45), "lp", 800)
+    splat = env(biquad(noise(rng, n), "lp", sweep(2200, 180, 0.08), q=1.2), 0.18)
+    gurgle = scale(bubbles(rng, n, 40, 150, 600, 0.9), 0.6)
+    return finish(reverb(drive(mix(scale(groan, 1.3), splat, gurgle), 1.8), 0.2, size=1.1), fade=0.15)
+
+
+def nest_birth(rng, v):
+    """A crawler squeezes out of the nest: a slick squelch and a tiny chirp."""
+    n = int(0.4 * RATE)
+    squelch = env(biquad(noise(rng, n), "bp", sweep(400, 1300 + 100 * v, 0.06), q=2.5), 0.09)
+    squelch = [x * min(1.0, i / (0.04 * RATE)) for i, x in enumerate(squelch)]
+    chirp = scale(delayed(fm(n, sweep(2600 + 120 * v, 1900, 0.05), 53, 0.25, 0.04), 0.17), 0.35)
+    return finish(drive(mix(squelch, chirp, scale(bubbles(rng, n, 6, 400, 900, 0.2), 0.4)), 1.5), fade=0.05)
+
+
 # name: (generator(rng, variant) -> samples, loudness). Loudness is the RMS of
 # the loudest 50 ms above 200 Hz, i.e. roughly how loud it sounds on laptop
 # speakers, so these numbers compare directly; peaks are capped at 0.9.
@@ -538,6 +588,11 @@ SOUNDS = {
     "minigun": (lambda rng, v: gun(rng, 0.2, 0.6, sweep(6000 - 300 * v, 1500, 0.01), 0.015,
                                    sweep(170 - 8 * v, 80, 0.006), 0.01, 0.5, 2.2, 0.12, 0.7), 0.16),
     "flamethrower": (flamethrower, 0.14),
+    "shield_block": (shield_block, 0.11),
+    "splitter_death": (splitter_death, 0.16),
+    "shielder_death": (shielder_death, 0.20),
+    "nest_death": (nest_death, 0.22),
+    "nest_birth": (nest_birth, 0.11),
 }
 
 

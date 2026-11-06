@@ -371,7 +371,7 @@ func (g *Game) updateNest(e *Enemy, st enemyStats) {
 				pos = e.Pos
 			}
 			g.spawnHunter('C', pos).Parent = e
-			g.sound("spit", e.Pos)
+			g.sound("nest_birth", e.Pos)
 		}
 		if e.T >= st.attackLen {
 			e.setState(stChase)
@@ -811,7 +811,7 @@ func (g *Game) kill(e *Enemy) {
 
 var deathSound = map[enemyKind]string{crawler: "crawler_death", spitter: "spitter_death", drone: "drone_death",
 	bomber: "explosion", brute: "brute_death", brood: "boss_death", warden: "warden_death", maw: "boss_death",
-	splitter: "spitter_death", shielder: "brute_death", nest: "spitter_death"}
+	splitter: "splitter_death", shielder: "shielder_death", nest: "nest_death"}
 
 // height is how far above the feet an enemy's body centre is (for aiming).
 func (e *Enemy) height() float64 {

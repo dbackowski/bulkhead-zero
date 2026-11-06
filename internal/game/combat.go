@@ -105,7 +105,7 @@ func (g *Game) stepBullet(b *Bullet) bool {
 				}
 				if e.blocks(b.Vel) && !b.Flame {
 					g.spawnFX("fx.hit_spark", visual, 0)
-					g.sound("hit_metal", b.Ground)
+					g.sound("shield_block", b.Ground)
 					return false
 				}
 				g.damageEnemy(e, b.Dmg, b.Ground.Sub(b.Vel))
