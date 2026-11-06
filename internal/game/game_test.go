@@ -293,7 +293,7 @@ func TestPickups(t *testing.T) {
 	p.Spare[r] = 0
 	g.pickups = []*Pickup{{Kind: pickAmmo, Pos: p.Pos}}
 	g.updatePickups()
-	if p.Spare[r] != g.weapons[r].Ammo/2 {
+	if p.Spare[r] != g.weapons[r].Ammo/ammoBox {
 		t.Fatalf("ammo pickup gave the rifle %d spare rounds", p.Spare[r])
 	}
 	g.pickups = []*Pickup{{Kind: pickAmmo, Pos: p.Pos.Add(geom.V(200, 0))}}

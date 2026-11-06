@@ -203,7 +203,7 @@ func (g *Game) updateShots() {
 }
 
 // crateDrop is the chance a broken crate leaves a pickup.
-const crateDrop = 0.5
+const crateDrop = 0.35
 
 // damageProp wears down a barrel or crate: at 0 HP barrels explode and
 // crates break. Props without HP shrug it off.

@@ -16,7 +16,7 @@ type pickupKind int
 
 const (
 	pickHealth pickupKind = iota // +pickupHP health
-	pickAmmo                     // half a full load of spare rounds for every unlocked gun
+	pickAmmo                     // ammoBox of a full load of spare rounds for every unlocked gun
 	pickWeapon                   // unlocks the gun in Slot; never times out
 	pickHeavy                    // the heavy weapon in Slot, fully loaded; lasts until the deck ends
 )
@@ -34,6 +34,7 @@ const (
 	pickupLife     = 25.0 // seconds on the floor; it blinks for the last 4
 	pickupRange    = 14.0 // px from the player's feet
 	healthChance   = 0.4  // share of drops that are health rather than ammo
+	ammoBox        = 3    // an ammo box gives 1/ammoBox of each gun's full spare load
 	bruteGunChance = 0.1  // a brute drops the next gun instead of health or ammo
 )
 
@@ -192,7 +193,7 @@ func (g *Game) collect(pk *Pickup) bool {
 	}
 	for i, w := range g.weapons[:g.unlocked] {
 		if w.Ammo > 0 {
-			p.Spare[i] = min(p.Spare[i]+w.Ammo/2, w.Ammo)
+			p.Spare[i] = min(p.Spare[i]+w.Ammo/ammoBox, w.Ammo)
 		}
 	}
 	return true

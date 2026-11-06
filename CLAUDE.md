@@ -201,8 +201,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
 - **Pickups** (`pickups.go`): dying enemies may drop one (`dropChance`: crawler 12%,
   spitter/drone 40%, splitter 30%, shield-bearer 50%, brute and nest always; bombers, the
   boss's brood and crawlers from a nest or splitter, marked by `Enemy.Parent`, never) and
-  broken crates `crateDrop` (50%) of the time (`dropAt`), 40% health (+2 HP)
-  and 60% ammo (half a full load of spare rounds for every unlocked gun). Walk over to
+  broken crates `crateDrop` (35%) of the time (`dropAt`), 40% health (+2 HP)
+  and 60% ammo (a third of a full load of spare rounds for every unlocked gun, `ammoBox`). Walk over to
   collect; one you can't use stays on the floor. They vanish after 25 s, blinking for the
   last 4.
 - **Heavy weapons** (`dropHeavy`, `pickHeavy`): the minigun (160 rounds, spins up for
@@ -368,8 +368,14 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   or `heavyChance`/heavy `mag`, are the levers if a person finds it easy). Levers: `heavyWave`, `heavyChance`,
   heavy `mag`, each deck's `waves`, boss `hp` and `cooldown`, `gunWave`, `bruteGunChance`,
   `waveHeal`, `reload_ms`, `dropChance`.
-- Ammo is plentiful for the bot (more so with crates dropping pickups), so `dropChance`,
-  `crateDrop` and `ammo` could tighten if it never feels scarce.
+- Ammo was measured (November 2026, 20 handicapped-bot games per deck): with boxes giving
+  half a load and crates dropping 50%, the gun in hand was empty under 2% of the time and
+  every gun was never dry at once, so boxes went to a third (`ammoBox` 3) and crates to
+  35%. Now the gun in hand is empty 1.5–6% of the time (it switches or goes for a box),
+  still never all at once, ~9 boxes drop per game and most get taken; the bot clears
+  43/60, 50/60 and 43/60. The bot leans on one gun (the smg) and leaves the others full,
+  so a person switching around will feel it less. If it still never feels scarce, the next
+  levers are `ammo` (max spare) in make_sprites.py and `dropChance`.
 - More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call. Music per
   deck (e.g. the Reactor transposed or with its own lead) would be new `TRACKS` entries
   plus a deck field choosing them.
