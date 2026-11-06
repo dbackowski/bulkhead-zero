@@ -17,14 +17,15 @@ type level struct {
 	name     string
 	rows     []string
 	waves    []string
-	boss     byte // M Brood Mother, W Warden, O the Maw
-	unlocked int  // guns held at the latest when the deck starts (what the guaranteed drops give by then)
+	boss     byte   // M Brood Mother, W Warden, O the Maw
+	unlocked int    // guns held at the latest when the deck starts (what the guaranteed drops give by then)
+	music    string // suffix of its music loops: calm<music>, combat<music>, boss<music>
 }
 
 var levels = []level{
-	{"DECK 1: HABITAT", world.Station, []string{"CCCCCCEE", "CCCYRRGEE", "CCCCCRRRGGEEE", "CCYYYRRGEE"}, 'M', 2},
-	{"DECK 2: REACTOR", world.Reactor, []string{"CCCRREE", "CCURRGEE", "CCCCRRRGGEE", "CCUURRYGEE"}, 'W', 4},
-	{"DECK 3: HYDROPONICS", world.Hydroponics, []string{"CCCCRREEG", "CCCCCRRGEE", "CCCCCRRRGGEEE", "CCYYUURRE"}, 'O', 6},
+	{"DECK 1: HABITAT", world.Station, []string{"CCCCCCEE", "CCCYRRGEE", "CCCCCRRRGGEEE", "CCYYYRRGEE"}, 'M', 2, ""},
+	{"DECK 2: REACTOR", world.Reactor, []string{"CCCRREE", "CCURRGEE", "CCCCRRRGGEE", "CCUURRYGEE"}, 'W', 4, "_reactor"},
+	{"DECK 3: HYDROPONICS", world.Hydroponics, []string{"CCCCRREEG", "CCCCCRRGEE", "CCCCCRRRGGEEE", "CCYYUURRE"}, 'O', 6, "_hydroponics"},
 }
 
 var bossName = map[enemyKind]string{brood: "BROOD MOTHER", warden: "THE WARDEN", maw: "THE MAW"}

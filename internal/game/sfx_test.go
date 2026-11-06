@@ -29,7 +29,7 @@ func TestSoundsExist(t *testing.T) {
 }
 
 func TestMusicExists(t *testing.T) {
-	for _, name := range musicTracks {
+	for _, name := range musicTracks() {
 		b, err := fs.ReadFile(assets.FS, "music/music_"+name+".wav")
 		if err != nil {
 			t.Fatal(err)
@@ -80,5 +80,12 @@ func TestMusicTrack(t *testing.T) {
 	g.boss = g.spawnHunter('M', g.lvl.Boss)
 	if got := g.musicTrack(); got != "boss" {
 		t.Fatalf("with a boss: %s", got)
+	}
+	g.level = 2 // each deck has its own loops
+	if err := g.reset(); err != nil {
+		t.Fatal(err)
+	}
+	if got := g.musicTrack(); got != "calm_hydroponics" {
+		t.Fatalf("at the start of deck 3: %s", got)
 	}
 }

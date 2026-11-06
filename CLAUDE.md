@@ -67,7 +67,7 @@ All art and sound comes from code. Change the scripts, then regenerate:
 
 ```
 pip3 install -r tools/artgen/requirements.txt   # Pillow
-python3 tools/artgen/build.py                   # sheets + JSON + sounds + music + previews (~50 s)
+python3 tools/artgen/build.py                   # sheets + JSON + sounds + music + previews (~2 min)
 python3 tools/artgen/build.py --no-previews     # just the game assets
 ```
 
@@ -78,7 +78,7 @@ Check new art by reading the PNGs in `docs/previews/` (look at them, don't just 
 each track is a `Track` with drum, bass, pad and lead parts, mixed by target loudness per
 part (`mixdown` levels) then gently limited; the render's tail is folded onto its start so
 it loops without a seam. It renders at 44.1 kHz and writes 22.05 kHz to keep files small
-(~1.2 MB each). It takes most of the build time (~30 s). When changing it, plot the result:
+(~1.2 MB each). It takes most of the build time (~100 s for the nine loops). When changing it, plot the result:
 a solid wall of waveform means the mix is clipping.
 `build.py` deletes old WAVs only after everything generated, so a failed run leaves the
 assets alone.
@@ -262,10 +262,15 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   nest each have their own death sound (`splitter_death`, `shielder_death`, `nest_death`).
   `hurt` and `player_death` are a voice made by source-filter synthesis (`voice()` in make_sfx.py). `BZ_MUTE=1`
   or running under `go test` skips audio entirely (no audio context is created).
-- **Music** (`sfx.go`, `musicTrack`/`updateMusic`): three loops, `calm` (exploring, between
+- **Music** (`sfx.go`, `musicTrack`/`updateMusic`): each deck has three loops, `calm` (exploring, between
   fights, death and win screens), `combat` (while a wave is coming in or any enemy is awake,
   lingering 5 s after, longer than a wave break so it carries through) and `boss` (while a
-  boss lives). Switching crossfades over 1.5 s and a loop that fades in starts from its
+  boss lives), named with the deck's `music` suffix: deck 1 plays `calm`/`combat`/`boss`
+  (A minor, bells, a rock kit), the Reactor `*_reactor` (D/E minor, a mechanical
+  square-wave ostinato, metallic ticks, a tighter kit) and Hydroponics `*_hydroponics`
+  (E Phrygian, sparse ringing bells, tribal toms instead of a kit). They're the same three
+  functions in `make_music.py` called with a different progression, tempo, lead and drum
+  style (`TRACKS`). Switching crossfades over 1.5 s (also from one deck's loop to the next's) and a loop that fades in starts from its
   beginning. Music sits at 0.45 volume under the effects, drops to 40% while paused, and
   M mutes it with everything else.
 - **Stingers** (`g.stinger(name)`): short musical cues from `STINGERS` in make_music.py,
@@ -381,9 +386,9 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   43/60, 50/60 and 43/60. The bot leans on one gun (the smg) and leaves the others full,
   so a person switching around will feel it less. If it still never feels scarce, the next
   levers are `ammo` (max spare) in make_sprites.py and `dropChance`.
-- More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call. Music per
-  deck (e.g. the Reactor transposed or with its own lead) would be new `TRACKS` entries
-  plus a deck field choosing them.
+- More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call. A new
+  deck's music is three `TRACKS` entries (appended, they're seeded by position) plus its
+  `music` suffix in `levels`.
 - More decks: a map in `maps.go` (keep `TestMapsAreConnected` passing) plus an entry in
   `levels`; a new boss is a kind, a stats entry, an attack function and a bosses.png row.
   The Reactor and Hydroponics maps are laid out by `tools/maps/reactor.py` and

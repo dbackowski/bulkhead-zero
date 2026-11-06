@@ -35,8 +35,17 @@ type track struct {
 	vol float64
 }
 
-// Music loops, assets/music/music_<name>.wav.
-var musicTracks = []string{"calm", "combat", "boss"}
+// musicTracks lists every music loop (assets/music/music_<name>.wav): each
+// deck has its own calm, combat and boss loop, named with its music suffix.
+func musicTracks() []string {
+	var names []string
+	for _, l := range levels {
+		for _, base := range []string{"calm", "combat", "boss"} {
+			names = append(names, base+l.music)
+		}
+	}
+	return names
+}
 
 const (
 	musicVolume  = 0.45 // under the sound effects
@@ -85,7 +94,7 @@ func newSFX(fsys fs.FS) (*sfx, error) {
 		ctx = audio.NewContext(sampleRate)
 	}
 	s := &sfx{ctx: ctx, clips: clips, last: map[string]float64{}, music: map[string]*track{}, duck: 1}
-	for _, name := range musicTracks {
+	for _, name := range musicTracks() {
 		b, err := fs.ReadFile(fsys, "music/music_"+name+".wav")
 		if err != nil {
 			return nil, err
@@ -112,19 +121,19 @@ func (g *Game) stinger(name string) {
 	}
 }
 
-// musicTrack picks the loop for the moment: the boss theme while a boss is
-// alive, combat while enemies are hunting the player (and for a few seconds
-// after), calm otherwise.
+// musicTrack picks the current deck's loop for the moment: the boss theme
+// while a boss is alive, combat while enemies are hunting the player (and
+// for a few seconds after), calm otherwise.
 func (g *Game) musicTrack() string {
+	mood := "calm"
 	switch {
 	case g.state == stateDead || g.state == stateClear:
-		return "calm"
 	case g.boss != nil && g.boss.State != stDead:
-		return "boss"
+		mood = "boss"
 	case g.fightT > 0:
-		return "combat"
+		mood = "combat"
 	}
-	return "calm"
+	return mood + g.deck().music
 }
 
 // updateFight keeps fightT topped up while a wave is coming in or any enemy
