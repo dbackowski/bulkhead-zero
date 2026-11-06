@@ -729,7 +729,7 @@
         6
       ],
       "fire_ms": 40,
-      "spread_deg": 9,
+      "spread_deg": 16,
       "pellets": 1,
       "recoil_px": 0,
       "bullet_speed": 190,

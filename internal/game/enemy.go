@@ -104,6 +104,9 @@ const (
 	shieldTurn = 1.3 // radians per second it turns toward the player
 	shieldBash = 110 // px/s, its lunge
 	nestBrood  = 3   // crawlers a nest keeps alive at most
+
+	burnTime = 1.3 // seconds an enemy keeps burning after the flamethrower last hit it
+	burnTick = 0.4 // seconds between its burn damage (1 each)
 )
 
 // Enemy is any hostile. Pos is the feet (or, for the drone, its shadow).
@@ -125,6 +128,8 @@ type Enemy struct {
 	Pattern  int      // boss: which attack comes next
 	Face     float64  // shielder: where its shield points (radians)
 	Parent   *Enemy   // the nest or splitter it came out of
+	Burn     float64  // seconds of burning left
+	BurnT    float64  // until the next burn damage
 }
 
 func newEnemy(s world.Spawn, rng *rand.Rand) *Enemy {
@@ -173,6 +178,9 @@ func (g *Game) updateEnemy(e *Enemy) {
 		e.DeadT += dt
 		return
 	}
+	if g.updateBurn(e) {
+		return // burnt to death
+	}
 	st := stats[e.Kind]
 	e.T += dt
 	e.AnimT += dt
@@ -216,6 +224,32 @@ func (g *Game) updateEnemy(e *Enemy) {
 	case nest:
 		g.updateNest(e, st)
 	}
+}
+
+// ignite sets an enemy on fire, or keeps it burning.
+func (e *Enemy) ignite() {
+	if e.Burn <= 0 {
+		e.BurnT = burnTick
+	}
+	e.Burn = burnTime
+}
+
+// updateBurn hurts a burning enemy now and then and shows flames on it. It
+// reports whether that killed it.
+func (g *Game) updateBurn(e *Enemy) bool {
+	if e.Burn <= 0 {
+		return false
+	}
+	e.Burn -= dt
+	if !e.hidden() && g.rng.Float64() < dt/0.08 {
+		off := geom.V(g.rng.Float64()*10-5, e.height()+g.rng.Float64()*6-2)
+		g.spawnFX("fx.flame", e.Pos.Sub(off), 0)
+	}
+	if e.BurnT -= dt; e.BurnT <= 0 {
+		e.BurnT = burnTick
+		g.damageEnemy(e, 1, e.Pos)
+	}
+	return e.State == stDead
 }
 
 // chaseDir points straight at the player when visible and close, otherwise
@@ -327,7 +361,7 @@ func (g *Game) updateShielder(e *Enemy, st enemyStats, d float64, los bool) {
 	p := g.player
 	if e.State != stAttack && los {
 		diff := angleDiff(p.Pos.Sub(e.Pos).Angle(), e.Face)
-		e.Face += clamp(diff, -shieldTurn*dt, shieldTurn*dt)
+		e.Face = math.Remainder(e.Face+clamp(diff, -shieldTurn*dt, shieldTurn*dt), 2*math.Pi)
 	}
 	e.FaceLeft = math.Cos(e.Face) < 0
 	switch {

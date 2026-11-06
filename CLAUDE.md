@@ -207,14 +207,18 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   last 4.
 - **Heavy weapons** (`dropHeavy`, `pickHeavy`): the minigun (160 rounds, spins up for
   0.4 s, very fast, you move at 55% while firing) and the flamethrower (110 puffs, ~4.4 s:
-  a short jet that goes through every enemy in its path and stops at walls). Clearing wave
+  a cone ±16° wide of puffs at varied speeds that goes through every enemy in its path and
+  stops at walls; what it touches burns for `burnTime` (1.3 s) after the last hit, taking 1
+  damage every `burnTick` (0.4 s) with small flames on it, `ignite`/`updateBurn`). Clearing wave
   `heavyWave` (4) drops a random one for the last wave and the boss; brutes, shield-bearers,
   splitters and nests sometimes drop one instead of health/ammo (`heavyChance`, 2–10%).
   Only one lies on the floor at a time and it doesn't vanish. Walking over one puts it
   straight in your hands, replacing the heavy you carried; ammo pickups don't refill it,
   R doesn't reload it, and when it runs dry it's thrown away and you're back on the gun
   you held before (`LastGun`). Heavies don't come along to the next deck or a retry. The
-  bot uses one on anything in sight (the flamethrower only within 80 px).
+  bot uses one on anything in sight (the flamethrower only within 80 px) and keeps the
+  minigun's trigger held while a target is visible (it used to let go between shots, so
+  the barrels never spun up and a lone shield-bearer could stall it forever).
 - **Gun drops** (`dropGun`): you start with pistol and rifle; the rest unlock in
   `weaponOrder` by picking up a dropped gun (`pickWeapon`, drawn as the gun itself,
   glinting). Clearing wave `gunWave` (2) drops the next gun you lack where the last enemy
@@ -358,7 +362,10 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   shield and circles it. With heavy weapons (November 2026) it kept too much HP on deck 1
   (6.2/8 left, the guard-rail is 6), mostly from using the guaranteed heavy on the Brood
   Mother, so she went 120 → 140 HP and heavy ammo and drop chances were trimmed; now
-  48/60, 45/60 and 42/60 with ~5, 5 and 4 HP left. Levers: `heavyWave`, `heavyChance`,
+  48/60, 45/60 and 42/60 with ~5, 5 and 4 HP left. After the burning flamethrower and the
+  bot's minigun fix: 47/60, 50/60 and 54/60 (~5, 5, 4.5 HP left); deck 3 is no longer the
+  hardest for the bot, mostly because the minigun now works against the Maw (its `hp`,
+  or `heavyChance`/heavy `mag`, are the levers if a person finds it easy). Levers: `heavyWave`, `heavyChance`,
   heavy `mag`, each deck's `waves`, boss `hp` and `cooldown`, `gunWave`, `bruteGunChance`,
   `waveHeal`, `reload_ms`, `dropChance`.
 - Ammo is plentiful for the bot (more so with crates dropping pickups), so `dropChance`,

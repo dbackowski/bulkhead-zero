@@ -501,3 +501,30 @@ func TestHeavyWeapons(t *testing.T) {
 		t.Fatal("dropHeavy should leave one heavy weapon on the floor at a time")
 	}
 }
+
+// Flames set an enemy on fire: it keeps taking damage for burnTime after the
+// last hit, then stops.
+func TestBurning(t *testing.T) {
+	g, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.enemies = nil
+	e := g.spawnHunter('G', g.player.Pos.Add(geom.V(200, 0)))
+	from := e.Pos.Sub(geom.V(20, 0))
+	g.bullets = []*Bullet{{Ground: from, Vel: geom.V(190, 0), Life: 0.38, Dmg: 1, Anim: "fx.flame", Pierce: 99, Flame: true}}
+	for i := 0; i < 30 && len(g.bullets) > 0; i++ {
+		g.updateBullets()
+	}
+	hit := e.HP
+	if hit != stats[brute].hp-1 || e.Burn <= 0 {
+		t.Fatalf("after one puff: HP %d, burning %.2f s", e.HP, e.Burn)
+	}
+	for i := 0; i < int(burnTime*60)+30; i++ {
+		g.updateBurn(e)
+	}
+	ticks := int(math.Floor(burnTime / burnTick))
+	if burnt := hit - e.HP; burnt != ticks || e.Burn > 0 {
+		t.Fatalf("burning did %d damage and %.2f s are left, want %d and none", burnt, e.Burn, ticks)
+	}
+}

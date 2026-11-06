@@ -476,7 +476,7 @@ def weapon_flamethrower():
     line(w, 5, 9, 9, 7, G0)                  # hose
     rect(w, 11, 7, 12, 9, G0)                # grip
     _glove(w, 9, 7)
-    return outline(w), {"pivot": [9, 7], "muzzle": [21, 6], "fire_ms": 40, "spread_deg": 9,
+    return outline(w), {"pivot": [9, 7], "muzzle": [21, 6], "fire_ms": 40, "spread_deg": 16,
                         "pellets": 1, "recoil_px": 0, "bullet_speed": 190, "damage": 1,
                         "mag": 110, "heavy": True, "projectile": "flame", "pierce": 99,
                         "life_ms": 380, "flame": True}

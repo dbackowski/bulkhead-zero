@@ -163,6 +163,9 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		in.Fire = onTarget
 		in.FirePressed = onTarget && int(a.t*60)%14 == 0
 	}
+	if vis != nil && g.weapons[p.Slot].SpinMS > 0 {
+		in.Fire = true // keep the minigun spinning between bursts
+	}
 
 	in.Reload = vis == nil && p.Mag[p.Slot] < g.weapons[p.Slot].Mag/2
 

@@ -111,6 +111,7 @@ func (g *Game) stepBullet(b *Bullet) bool {
 				g.damageEnemy(e, b.Dmg, b.Ground.Sub(b.Vel))
 				switch {
 				case b.Flame:
+					e.ignite()
 				case e.Kind == drone:
 					g.spawnFX("fx.hit_spark", visual, 0)
 					g.sound("hit_metal", b.Ground)

@@ -282,6 +282,9 @@ func (g *Game) fire(w *gfx.Weapon) {
 		} else {
 			a += (g.rng.Float64()*2 - 1) * spread
 		}
+		if w.Flame { // puffs at different speeds fill out the cone
+			speed *= 0.8 + g.rng.Float64()*0.4
+		}
 		g.bullets = append(g.bullets, &Bullet{
 			Ground: muzzle.Add(geom.V(0, height)),
 			Vel:    geom.FromAngle(a).Scale(speed),
