@@ -19,9 +19,10 @@ func TestSpriteMetaHasWhatTheGameUses(t *testing.T) {
 			"spitter.idle", "spitter.attack", "spitter.death", "drone.idle", "drone.attack", "drone.death",
 			"bomber.walk_right", "bomber.attack_right", "bomber.death", "brute.walk_right", "brute.attack_right", "brute.death",
 			"splitter.walk_right", "splitter.attack_right", "splitter.death", "shielder.walk_right",
-			"shielder.attack_right", "shielder.shield", "shielder.death", "nest.idle", "nest.attack", "nest.death"},
+			"shielder.attack_right", "shielder.shield", "shielder.death", "nest.idle", "nest.attack", "nest.death",
+			"node.idle", "node.death"},
 		"bosses.png": {"brood.idle", "brood.attack", "brood.death", "warden.idle", "warden.attack", "warden.death",
-			"maw.idle", "maw.attack", "maw.death"},
+			"maw.idle", "maw.attack", "maw.death", "overmind.idle", "overmind.attack", "overmind.death"},
 		"fx.png": {"bullet", "laser", "hit_spark", "acid_glob", "acid_splash", "explosion", "muzzle_flash", "crosshair",
 			"plasma", "grenade", "spine", "flame"},
 	}

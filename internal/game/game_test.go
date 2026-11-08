@@ -19,7 +19,7 @@ func TestAutopilotRound(t *testing.T) {
 	}
 	g.autopilot = newAutopilot()
 	start := g.aliveFoes()
-	for i := 0; i < 60*900 && g.state == statePlaying; i++ { // every deck in a row: allow ~15 minutes
+	for i := 0; i < 60*1200 && g.state == statePlaying; i++ { // every deck in a row: allow ~20 minutes
 		if err := g.Update(); err != nil {
 			t.Fatal(err)
 		}
@@ -526,5 +526,59 @@ func TestBurning(t *testing.T) {
 	ticks := int(math.Floor(burnTime / burnTick))
 	if burnt := hit - e.HP; burnt != ticks || e.Burn > 0 {
 		t.Fatalf("burning did %d damage and %.2f s are left, want %d and none", burnt, e.Burn, ticks)
+	}
+}
+
+// The Overmind takes no damage while a node stands; with them all down its
+// shield drops for overmindExpose seconds, then the nodes grow back.
+func TestOvermindShield(t *testing.T) {
+	g, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.level = 3
+	if err := g.reset(); err != nil {
+		t.Fatal(err)
+	}
+	g.enemies = nil
+	b := g.spawnHunter('K', g.lvl.Boss)
+	g.boss = b
+	g.player.Pos = g.lvl.Start
+	step := func(secs float64) {
+		for i := 0; i < int(secs*60); i++ {
+			g.player.Invuln = 1
+			g.updateEnemy(b)
+		}
+	}
+	nodes := func() (n []*Enemy) {
+		for _, e := range g.enemies {
+			if e.Parent == b && e.State != stDead {
+				n = append(n, e)
+			}
+		}
+		return n
+	}
+	step(0.1)
+	if len(nodes()) != overmindNodes || !b.Shielded {
+		t.Fatalf("at the start: %d nodes, shielded %v", len(nodes()), b.Shielded)
+	}
+	g.damageEnemy(b, 5, g.player.Pos)
+	if b.HP != stats[overmind].hp {
+		t.Fatal("the shield let damage through")
+	}
+	for _, n := range nodes() {
+		g.kill(n)
+	}
+	step(0.1)
+	if b.Shielded || b.Exposed <= 0 {
+		t.Fatal("killing every node should drop the shield")
+	}
+	g.damageEnemy(b, 5, g.player.Pos)
+	if b.HP != stats[overmind].hp-5 {
+		t.Fatal("no damage with the shield down")
+	}
+	step(overmindExpose + 0.2)
+	if len(nodes()) != overmindNodes || !b.Shielded {
+		t.Fatalf("after the exposure: %d nodes, shielded %v", len(nodes()), b.Shielded)
 	}
 }

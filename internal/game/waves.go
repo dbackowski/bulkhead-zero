@@ -17,7 +17,7 @@ type level struct {
 	name     string
 	rows     []string
 	waves    []string
-	boss     byte   // M Brood Mother, W Warden, O the Maw
+	boss     byte   // M Brood Mother, W Warden, O the Maw, K the Overmind
 	unlocked int    // guns held at the latest when the deck starts (what the guaranteed drops give by then)
 	music    string // suffix of its music loops: calm<music>, combat<music>, boss<music>
 }
@@ -26,9 +26,10 @@ var levels = []level{
 	{"DECK 1: HABITAT", world.Station, []string{"CCCCCCEE", "CCCYRRGEE", "CCCCCRRRGGEEE", "CCYYYRRGEE"}, 'M', 2, ""},
 	{"DECK 2: REACTOR", world.Reactor, []string{"CCCRREE", "CCURRGEE", "CCCCRRRGGEE", "CCUURRYGEE"}, 'W', 4, "_reactor"},
 	{"DECK 3: HYDROPONICS", world.Hydroponics, []string{"CCCCRREEG", "CCCCCRRGEE", "CCCCCRRRGGEEE", "CCYYUURRE"}, 'O', 6, "_hydroponics"},
+	{"DECK 4: COMMAND", world.Command, []string{"CCYURRE", "CCCYURRGEE", "CCYYURRGEE", "CCYYUURRGEE"}, 'K', 6, "_command"},
 }
 
-var bossName = map[enemyKind]string{brood: "BROOD MOTHER", warden: "THE WARDEN", maw: "THE MAW"}
+var bossName = map[enemyKind]string{brood: "BROOD MOTHER", warden: "THE WARDEN", maw: "THE MAW", overmind: "THE OVERMIND"}
 
 func (g *Game) deck() level { return levels[g.level] }
 
@@ -115,7 +116,7 @@ func (g *Game) startWave() {
 	g.boss.CD = 2
 	g.totalFoes = 1
 	g.shake(5, 0.6)
-	g.sound(map[enemyKind]string{brood: "boss_roar", warden: "warden_alarm", maw: "burrow"}[g.boss.Kind], g.boss.Pos)
+	g.sound(map[enemyKind]string{brood: "boss_roar", warden: "warden_alarm", maw: "burrow", overmind: "boss_roar"}[g.boss.Kind], g.boss.Pos)
 	g.say("WARNING\n"+bossName[g.boss.Kind], 3)
 	g.stinger("boss")
 }

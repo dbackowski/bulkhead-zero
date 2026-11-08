@@ -4,11 +4,11 @@ Top-down sci-fi shooter: a lone marine clears an infested space station.
 WASD to move, mouse to aim (full 360°), click to shoot.
 Go + **Ebitengine v2** (`github.com/hajimehoshi/ebiten/v2`), pixel art at 24×24 per tile/frame.
 
-**Status:** playable prototype. Three station decks (Habitat, Reactor, Hydroponics), each
+**Status:** playable prototype. Four station decks (Habitat, Reactor, Hydroponics, Command), each
 played as 5 waves and a boss, the marine with 360° aiming, six guns (four found as drops) and two heavy weapons (minigun,
 flamethrower: rare, no reloads),
-crawlers / spitters / drones / bombers / brutes / splitters / shield-bearers / nests, three bosses (the Brood Mother, the Warden,
-the Maw),
+crawlers / spitters / drones / bombers / brutes / splitters / shield-bearers / nests, four bosses (the Brood Mother, the Warden,
+the Maw, the Overmind),
 magazines and reloading,
 health and ammo pickups, sliding doors, explosive barrels, HUD, sounds, music, win/lose and restart. See "Prototype: what exists" and "Next steps" at the end.
 
@@ -41,7 +41,7 @@ assets/sprites/   player.png, enemies.png, fx.png (one animation per row, 24×24
 assets/sounds/    <name>_<variant>.wav, 16-bit mono 44.1 kHz (the game picks a random variant)
 assets/music/     music_<name>.wav loops, 16-bit mono 22.05 kHz
 tools/artgen/     make_tiles.py, make_sprites.py, make_sfx.py, make_music.py, make_preview.py, build.py
-tools/maps/       reactor.py, hydroponics.py: lay out those maps by coordinates and write them
+tools/maps/       reactor.py, hydroponics.py, command.py: lay out those maps by coordinates and write them
                   into maps.go
 docs/previews/    enlarged sheets + scene.gif / animations.gif / aiming.png for viewing only
 ```
@@ -55,7 +55,7 @@ internal/geom           Vec (2D math)
 internal/gfx            sprites.json/tiles.json parsing, Library (anims, tiles, weapons, font),
                         draw helpers, Font (bitmap text)
 internal/world          map text format, autotile, doors, collision (MoveAndSlide), line of sight,
-                        BFS flow field for enemy pathing; maps.go holds the Station, Reactor and Hydroponics maps
+                        BFS flow field for enemy pathing; maps.go holds the Station, Reactor, Hydroponics and Command maps
 internal/game           Game loop, input, player, enemies (AI + stats table), combat
                         (bullets, enemy shots, blasts), waves.go (waves, boss, doors),
                         drawing (y-sorted), HUD, sound (sfx.go), devtools
@@ -122,8 +122,9 @@ fight simulation; port its logic rather than reinventing it.
   (one frame: the plate pointing right, rotated around the body toward its heading like the
   player's gun, behind the body when it points up), `nest.idle/attack/death` (faces the
   camera; attack = a crawler being born), `brood.idle/attack/death`, `warden.idle/attack/death` and
-  `maw.idle/attack/death` (48×48, in bosses.png; the Maw stands in its hole at the bottom of
-  the frame, and the game sinks and raises it by cropping the frame at the feet).
+  `maw.idle/attack/death` and `overmind.idle/attack/death` (48×48, in bosses.png; the Maw
+  stands in its hole at the bottom of the frame, and the game sinks and raises it by
+  cropping the frame at the feet), `node.idle/death` (the Overmind's shield pylons).
 - FX: `bullet`, `laser`, `plasma`, `grenade`, `spine` (all point right: rotate to the heading),
   `hit_spark`, `acid_glob`, `acid_splash`, `explosion`, `muzzle_flash`, `crosshair`, `debris`
   (a crate breaking), `flame` (a flamethrower puff, drawn by the shot's age so it swells,
@@ -227,8 +228,9 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   lying there when the deck ends comes along anyway. So with only the guaranteed drops you
   have 2, 4, then 6 guns at the start of each deck (`level.unlocked`, the minimum).
 - **Decks** (`levels` in `internal/game/waves.go`): each has a name, a map, its wave list,
-  its boss (map letter `M` Brood Mother, `W` Warden, `O` the Maw) and the fewest weapons it
-  starts with (2, then 4, 6; more if you found extra). Beating a deck's boss starts the next deck after 2.5 s with full HP and ammo,
+  its boss (letter `M` Brood Mother, `W` Warden, `O` the Maw, `K` the Overmind; it appears
+  at the map's `Q`), its music suffix and the fewest weapons it starts with (2, then 4, 6,
+  6; more if you found extra). Beating a deck's boss starts the next deck after 2.5 s with full HP and ammo,
   keeping the guns found (`carried`);
   dying (or R in the pause menu) retries the current deck from its start with the guns held then; after the last
   deck the station is clear and R / click starts again from deck 1.
@@ -267,8 +269,9 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   lingering 5 s after, longer than a wave break so it carries through) and `boss` (while a
   boss lives), named with the deck's `music` suffix: deck 1 plays `calm`/`combat`/`boss`
   (A minor, bells, a rock kit), the Reactor `*_reactor` (D/E minor, a mechanical
-  square-wave ostinato, metallic ticks, a tighter kit) and Hydroponics `*_hydroponics`
-  (E Phrygian, sparse ringing bells, tribal toms instead of a kit). They're the same three
+  square-wave ostinato, metallic ticks, a tighter kit) Hydroponics `*_hydroponics`
+  (E Phrygian, sparse ringing bells, tribal toms instead of a kit) and Command `*_command`
+  (C minor, cold bells over machine ticks, the fastest boss theme). They're the same three
   functions in `make_music.py` called with a different progression, tempo, lead and drum
   style (`TRACKS`). Switching crossfades over 1.5 s (also from one deck's loop to the next's) and a loop that fades in starts from its
   beginning. Music sits at 0.45 volume under the effects, drops to 40% while paused, and
@@ -304,7 +307,17 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   spines, and between them it burrows (state `stUnder`, `hidden()`: no hits, no contact):
   it sinks, digs toward the player as a dirt mound, waits 0.7 s under an orange marker,
   then bursts out (`blast` plus a ring of spines; crawlers too when enraged). Out of the
-  player's sight it always burrows. Timings are the `maw*` constants. Crates block bullets, lasers and spines in both
+  player's sight it always burrows. Timings are the `maw*` constants. The Overmind (105 HP,
+  `updateOvermind`, deck 4) never moves: it grows `overmindNodes` (3) nodes (`I`, 7 HP) in a
+  ring `nodeRing` (72 px) around it, tethered to it by cyan lines, and while any node stands
+  it is `Shielded` (a bubble; its health bar turns blue): `damageEnemy` ignores it and
+  shots ring off it. With every node down the shield drops and it is stunned for
+  `overmindExpose` (7 s, 75% when enraged; "SHIELD DOWN", `shield_down`), then the nodes
+  grow back (`shield_up`). Every 2.5 s it cycles a spiral of spines (volleys every
+  `spiralGap` 0.13 s along 2 turning arms for `overmindSpiral` 1.6 s; 3 faster arms
+  enraged), a fan of 5 lasers (7) and an acid barrage of 4 globs (6), sharing `laserFan`
+  and `acidBarrage` with the Warden and the Brood Mother. Touching it hurts; the bot skips
+  it while shielded and shoots the nodes. Crates block bullets, lasers and spines in both
   directions (cover), but only for a while: they have 10 HP (`propHP` in level.go), player
   bullets and blasts wear them down (`damageProp` in combat.go; enemy shots don't), and a
   broken crate leaves `decal_crate_wreck` (`g.wrecks`), debris, a `crate_break` sound and
@@ -383,7 +396,11 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   every gun was never dry at once, so boxes went to a third (`ammoBox` 3) and crates to
   35%. Now the gun in hand is empty 1.5–6% of the time (it switches or goes for a box),
   still never all at once, ~9 boxes drop per game and most get taken; the bot clears
-  43/60, 50/60 and 43/60. The bot leans on one gun (the smg) and leaves the others full,
+  43/60, 50/60 and 43/60, and deck 4 (Command, added after that) in 38/60 with 3.4/8 HP
+  left, the hardest on purpose. The Overmind first killed the bot every time (0/20, mostly
+  with its spiral); thinning the spiral, faster-to-break nodes, a longer exposure and a
+  slower attack rate brought it in, and its `hp` is the fine lever (100 → 42/60, 110 →
+  30/60, right on the test's line). The bot leans on one gun (the smg) and leaves the others full,
   so a person switching around will feel it less. If it still never feels scarce, the next
   levers are `ammo` (max spare) in make_sprites.py and `dropChance`.
 - More sounds are one `SOUNDS` entry in `make_sfx.py` plus one `g.sound` call. A new
@@ -391,8 +408,8 @@ Facings: `right, down_right, down, down_left, left, up_left, up, up_right`.
   `music` suffix in `levels`.
 - More decks: a map in `maps.go` (keep `TestMapsAreConnected` passing) plus an entry in
   `levels`; a new boss is a kind, a stats entry, an attack function and a bosses.png row.
-  The Reactor and Hydroponics maps are laid out by `tools/maps/reactor.py` and
-  `tools/maps/hydroponics.py` (rooms, openings and props as coordinates; `--print` shows
+  The Reactor, Hydroponics and Command maps are laid out by `tools/maps/reactor.py`,
+  `tools/maps/hydroponics.py` and `tools/maps/command.py` (rooms, openings and props as coordinates; `--print` shows
   them with column numbers; copy one for a new deck) rather than typed by hand, which
   avoids off-by-one columns; edit the script, not the strings in maps.go.
 - Possible later mode: turn-based tactics reusing the same tiles and sprites.

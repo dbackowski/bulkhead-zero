@@ -28,7 +28,7 @@ go run .
 
 ## How it plays
 
-- **Three decks.** The Habitat, the Reactor, then Hydroponics. Each is five waves and a boss: first clear
+- **Four decks.** The Habitat, the Reactor, Hydroponics, then Command. Each is five waves and a boss: first clear
   the enemies already on the deck, then the next waves come in through the outer doors.
   Beating the boss takes you to the next deck; dying restarts the deck you're on.
 - **Six guns.** You start with the pistol and rifle. The shotgun, smg, plasma rifle (its
@@ -53,11 +53,14 @@ go run .
   Warden, a security mech, keeps its distance, fires laser fans and mortar shells (orange
   markers show where they hit) and launches drones. The Maw, a giant worm in the grow beds,
   spits lines of acid and cones of spines, then burrows: a dirt mound digs toward you and
-  it bursts out under the orange marker, so keep moving.
+  it bursts out under the orange marker, so keep moving. The Overmind, the hive mind fused
+  into the station's computer, hides behind a shield while its three nodes stand: break
+  them, then hit it hard before they grow back, while dodging its spinning spiral of
+  spines.
 
 ## Status
 
-Playable prototype: three decks, eight enemy types, three bosses, six guns and two heavy weapons, generated music
+Playable prototype: four decks, eight enemy types, four bosses, six guns and two heavy weapons, generated music
 and sound. `CLAUDE.md` has the design decisions, asset formats, code layout, tuning notes
 and next steps.
 

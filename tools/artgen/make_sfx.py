@@ -547,6 +547,30 @@ def nest_birth(rng, v):
     return finish(drive(mix(squelch, chirp, scale(bubbles(rng, n, 6, 400, 900, 0.2), 0.4)), 1.5), fade=0.05)
 
 
+def shield_down(rng, v):
+    """The Overmind's shield fails: a falling power-down whine with crackling sparks."""
+    n = int(0.9 * RATE)
+    whine = tone(n, sweep(1400 + 60 * v, 90, 0.25), 0.4)
+    whine = [x * (1.0 if int(i / RATE * 40) % 3 else 0.4) for i, x in enumerate(whine)]  # stutters
+    crackle = [0.0] * n
+    for _ in range(30):
+        i = int(rng.expovariate(1 / 0.2) * RATE)
+        for j in range(int(0.003 * RATE)):
+            if i + j < n:
+                crackle[i + j] += rng.uniform(-1, 1) * math.exp(-j / (0.0008 * RATE))
+    hum = scale(tone(n, 110, 0.3), 0.4)
+    return finish(reverb(mix(scale(drive(whine, 2.0), 0.5), biquad(crackle, "hp", 2000), hum), 0.25, size=1.0), fade=0.1)
+
+
+def shield_up(rng, v):
+    """The shield comes back: a rising hum that locks into a bright chord."""
+    n = int(0.8 * RATE)
+    rise = [x * min(1.0, i / (0.5 * RATE)) for i, x in enumerate(tone(n, sweep(180, 620 + 30 * v, 0.18), 0.6))]
+    lock = mix(*[scale(delayed(tone(n, f, 0.25), 0.4), 0.3) for f in (620 + 30 * v, 930 + 45 * v, 1240 + 60 * v)])
+    shimmer = scale(env(biquad(noise(rng, n), "bp", 4500, q=2), 0.2, delay=0.4), 0.3)
+    return finish(reverb(mix(rise, lock, shimmer), 0.3, size=1.1), fade=0.1)
+
+
 # name: (generator(rng, variant) -> samples, loudness). Loudness is the RMS of
 # the loudest 50 ms above 200 Hz, i.e. roughly how loud it sounds on laptop
 # speakers, so these numbers compare directly; peaks are capped at 0.9.
@@ -593,6 +617,8 @@ SOUNDS = {
     "shielder_death": (shielder_death, 0.20),
     "nest_death": (nest_death, 0.22),
     "nest_birth": (nest_birth, 0.11),
+    "shield_down": (shield_down, 0.18),
+    "shield_up": (shield_up, 0.14),
 }
 
 

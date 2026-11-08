@@ -152,6 +152,7 @@ def tom(amp=1.0, f=110):
 Am, F, C, G, Dm, E = (57, 60, 64), (53, 57, 60), (48, 52, 55), (55, 59, 62), (50, 53, 57), (52, 56, 59)
 Bb, Gm, A = (46, 50, 53), (55, 58, 62), (57, 61, 64)
 Em, D, B = (52, 55, 59), (50, 54, 57), (47, 51, 54)
+Cm, Ab, Eb, Fm = (48, 51, 55), (44, 48, 51), (51, 55, 58), (53, 56, 60)
 
 
 class Track:
@@ -191,6 +192,7 @@ def rms(xs):
 #   Habitat      A minor, bells, a rock kit (the defaults)
 #   Reactor      D/E minor, a mechanical square-wave ostinato, metallic ticks
 #   Hydroponics  E Phrygian, sparse ringing bells, tribal toms instead of a kit
+#   Command      C minor, cold bells over machine ticks, the fastest boss theme
 def calm(rng, prog=(Am, F, C, E, Am, F, Dm, E), bpm=76, lead="bells", drums="pulse"):
     t = Track(bpm=bpm, bars=8)
     for bar, ch in enumerate(prog):
@@ -298,6 +300,11 @@ TRACKS = {
                                              arps=((0, 1, 2, 1), (2, 1, 0, 1)), duty=0.12, cutoff=3200, drums="tribal"),
     "boss_hydroponics": lambda rng: boss(rng, prog=(Em, F, Em, Bb, Em, F, Dm, Bb) * 2, bpm=126,
                                          stabs=((0, 0), (2.5, 2)), drums="tribal"),
+    "calm_command": lambda rng: calm(rng, prog=(Cm, Ab, Eb, G, Cm, Ab, Fm, G), bpm=72, lead="bells", drums="ticks"),
+    "combat_command": lambda rng: combat(rng, prog=(Cm, Cm, Ab, Bb, Cm, Cm, Ab, G) * 2, bpm=140,
+                                         arps=((0, 2, 1, 2), (2, 1, 0, 1)), duty=0.35, cutoff=2000, drums="kit16"),
+    "boss_command": lambda rng: boss(rng, prog=(Cm, Cm, Ab, G, Cm, Fm, Ab, G) * 2, bpm=158,
+                                     stabs=((0, 0), (0.5, 2), (1.5, 1), (2.5, 2), (3, 0))),
 }
 
 

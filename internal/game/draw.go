@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	voidColor = color.RGBA{18, 20, 28, 255}
-	globMark  = color.RGBA{120, 220, 60, 255}
-	shellMark = color.RGBA{238, 90, 40, 255}
-	dirtColor = color.RGBA{58, 42, 30, 255}
-	dirtLight = color.RGBA{118, 90, 60, 255}
+	voidColor   = color.RGBA{18, 20, 28, 255}
+	globMark    = color.RGBA{120, 220, 60, 255}
+	shellMark   = color.RGBA{238, 90, 40, 255}
+	dirtColor   = color.RGBA{58, 42, 30, 255}
+	dirtLight   = color.RGBA{118, 90, 60, 255}
+	shieldColor = color.RGBA{90, 226, 240, 255}
 )
 
 // renderLevel pre-draws floors, walls and decals into one big image.
@@ -165,7 +166,7 @@ func (g *Game) drawWorld(dst *ebiten.Image) {
 
 var enemyAnim = map[enemyKind]string{crawler: "crawler", spitter: "spitter", drone: "drone",
 	bomber: "bomber", brute: "brute", brood: "brood", warden: "warden", maw: "maw",
-	splitter: "splitter", shielder: "shielder", nest: "nest"}
+	splitter: "splitter", shielder: "shielder", nest: "nest", overmind: "overmind", node: "node"}
 
 func (g *Game) drawEnemy(dst *ebiten.Image, e *Enemy, cam geom.Vec) {
 	// side-on enemies only have *_right frames, mirrored for left
@@ -200,8 +201,19 @@ func (g *Game) drawEnemy(dst *ebiten.Image, e *Enemy, cam geom.Vec) {
 		g.drawBurrow(dst, e, img, cam)
 		return
 	}
+	if e.Kind == node && e.State != stDead && e.Parent != nil { // a tether feeding the Overmind's shield
+		from, to := e.Pos.Sub(geom.V(0, 18)).Sub(cam), e.Parent.Pos.Sub(geom.V(0, 22)).Sub(cam)
+		a := 0.35 + 0.25*math.Sin(g.t*9+e.Pos.X)
+		vector.StrokeLine(dst, float32(from.X), float32(from.Y), float32(to.X), float32(to.Y), 1, color.RGBA{90, 226, 240, uint8(255 * a)}, false)
+	}
 	if e.Kind != shielder || e.State == stDead {
 		gfx.DrawAtFeet(dst, img, e.Pos.X-cam.X, e.Pos.Y-cam.Y, o)
+		if e.Shielded { // the Overmind's shield bubble
+			c := e.Pos.Sub(geom.V(0, 22)).Sub(cam)
+			k := 0.5 + 0.5*math.Sin(g.t*4)
+			fillEllipse(dst, c, 27, 26, shieldColor, 0.1+0.06*k)
+			vector.StrokeCircle(dst, float32(c.X), float32(c.Y), 27, 1, color.RGBA{90, 226, 240, uint8(120 + 80*k)}, true)
+		}
 		return
 	}
 	behind := math.Sin(e.Face) < -0.35 // pointing away from the camera

@@ -63,7 +63,7 @@ func TestDoorsBlockUntilOpen(t *testing.T) {
 // tile should be reachable (catches walled-off rooms when editing a map).
 // Every map needs a boss spot and outer doors for the waves.
 func TestMapsAreConnected(t *testing.T) {
-	for name, rows := range map[string][]string{"Station": Station, "Reactor": Reactor, "Hydroponics": Hydroponics} {
+	for name, rows := range map[string][]string{"Station": Station, "Reactor": Reactor, "Hydroponics": Hydroponics, "Command": Command} {
 		t.Run(name, func(t *testing.T) { checkConnected(t, rows) })
 	}
 }

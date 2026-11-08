@@ -370,6 +370,18 @@
         "frames": 4,
         "frame_ms": 130,
         "loop": false
+      },
+      "node.idle": {
+        "row": 25,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true
+      },
+      "node.death": {
+        "row": 26,
+        "frames": 3,
+        "frame_ms": 130,
+        "loop": false
       }
     },
     "fx.png": {
@@ -523,6 +535,27 @@
       },
       "maw.death": {
         "row": 8,
+        "frames": 6,
+        "frame_ms": 130,
+        "loop": false,
+        "size": 48
+      },
+      "overmind.idle": {
+        "row": 9,
+        "frames": 4,
+        "frame_ms": 180,
+        "loop": true,
+        "size": 48
+      },
+      "overmind.attack": {
+        "row": 10,
+        "frames": 4,
+        "frame_ms": 90,
+        "loop": false,
+        "size": 48
+      },
+      "overmind.death": {
+        "row": 11,
         "frames": 6,
         "frame_ms": 130,
         "loop": false,

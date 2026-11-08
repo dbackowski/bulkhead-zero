@@ -23,14 +23,18 @@ const (
 	splitter // bites like a crawler; bursts into small crawlers when it dies
 	shielder // a riot shield in front stops bullets: get around it
 	nest     // never moves, births crawlers until destroyed
+	overmind // boss of deck 4: never moves, shielded while its nodes stand
+	node     // a pylon powering the Overmind's shield
 )
 
 // Map letters for each kind (see world/level.go), also used by the wave
 // lists; the bosses' letters are only used by the level list.
 var kindFor = map[byte]enemyKind{'C': crawler, 'S': spitter, 'R': drone, 'E': bomber, 'G': brute, 'M': brood, 'W': warden, 'O': maw,
-	'Y': splitter, 'U': shielder, 'N': nest}
+	'Y': splitter, 'U': shielder, 'N': nest, 'K': overmind, 'I': node}
 
-func (e *Enemy) isBoss() bool { return e.Kind == brood || e.Kind == warden || e.Kind == maw }
+func (e *Enemy) isBoss() bool {
+	return e.Kind == brood || e.Kind == warden || e.Kind == maw || e.Kind == overmind
+}
 
 // hidden is true while the Maw is underground (or sinking, or rising): it
 // can't be hit or touched then.
@@ -74,6 +78,9 @@ var stats = map[enemyKind]enemyStats{
 	shielder: {hp: 14, radius: 10, aggro: 190, speed: 36, cooldown: 1.4, attackLen: 1.0, fireAt: 0.4},
 	// nest: cooldown is the time between births
 	nest: {hp: 24, radius: 11, aggro: 200, speed: 0, cooldown: 3.2, attackLen: 0.45, fireAt: 0.3},
+	// overmind: attackLen is the laser fan and acid barrage; its spiral runs overmindSpiral
+	overmind: {hp: 105, radius: 18, aggro: 999, speed: 0, cooldown: 2.5, attackLen: 0.8, fireAt: 0.3},
+	node:     {hp: 7, radius: 9, aggro: 999, speed: 0},
 }
 
 // Enemy shots: how far ahead they aim (seconds of player movement) and laser speed (px/s).
@@ -105,6 +112,14 @@ const (
 	shieldBash = 110 // px/s, its lunge
 	nestBrood  = 3   // crawlers a nest keeps alive at most
 
+	// the Overmind: its nodes stand in a ring around it; with all of them down
+	// it is exposed (and stunned) for a while, then they grow back
+	overmindNodes  = 3
+	nodeRing       = 72.0 // px from the Overmind
+	overmindExpose = 7.0  // seconds exposed (75% of that when enraged)
+	overmindSpiral = 1.6  // seconds its spiral of spines lasts
+	spiralGap      = 0.13 // seconds between the spiral's volleys
+
 	burnTime = 1.3 // seconds an enemy keeps burning after the flamethrower last hit it
 	burnTick = 0.4 // seconds between its burn damage (1 each)
 )
@@ -130,6 +145,9 @@ type Enemy struct {
 	Parent   *Enemy   // the nest or splitter it came out of
 	Burn     float64  // seconds of burning left
 	BurnT    float64  // until the next burn damage
+	Shielded bool     // the Overmind while its nodes stand: takes no damage at all
+	Exposed  float64  // the Overmind: seconds left with its shield down
+	NextShot float64  // the Overmind's spiral: attack time of its next volley
 }
 
 func newEnemy(s world.Spawn, rng *rand.Rand) *Enemy {
@@ -223,11 +241,16 @@ func (g *Game) updateEnemy(e *Enemy) {
 		g.updateShielder(e, st, d, los)
 	case nest:
 		g.updateNest(e, st)
+	case overmind:
+		g.updateOvermind(e, st, d)
 	}
 }
 
 // ignite sets an enemy on fire, or keeps it burning.
 func (e *Enemy) ignite() {
+	if e.Shielded {
+		return
+	}
 	if e.Burn <= 0 {
 		e.BurnT = burnTick
 	}
@@ -390,7 +413,7 @@ func (e *Enemy) shieldUp() bool {
 
 // blocks reports whether e's shield stops a shot travelling with velocity v.
 func (e *Enemy) blocks(v geom.Vec) bool {
-	return e.shieldUp() && math.Abs(angleDiff(v.Scale(-1).Angle(), e.Face)) < shieldArc
+	return e.Shielded || e.shieldUp() && math.Abs(angleDiff(v.Scale(-1).Angle(), e.Face)) < shieldArc
 }
 
 // updateNest births a crawler every so often once awake, keeping at most
@@ -483,12 +506,7 @@ func (g *Game) wardenAttack(e *Enemy, enraged bool) {
 		if enraged {
 			n = 5
 		}
-		aim := p.Pos.Sub(from).Angle()
-		for i := 0; i < n; i++ {
-			a := aim + (float64(i)-float64(n-1)/2)*fanGap
-			g.shots = append(g.shots, &Shot{Kind: shotLaser, Ground: from, Vel: geom.FromAngle(a).Scale(fanSpeed), H: 22, Life: 2.5})
-		}
-		g.sound("laser", from)
+		g.laserFan(from, n)
 	case 1: // mortar shells that burst where they land (marked on the floor)
 		n := 2
 		if enraged {
@@ -516,8 +534,28 @@ func (g *Game) wardenAttack(e *Enemy, enraged bool) {
 	}
 }
 
-func (g *Game) broodAttack(e *Enemy, enraged bool) {
+// laserFan fires n slow lasers in a fan at the player.
+func (g *Game) laserFan(from geom.Vec, n int) {
+	aim := g.player.Pos.Sub(from).Angle()
+	for i := 0; i < n; i++ {
+		a := aim + (float64(i)-float64(n-1)/2)*fanGap
+		g.shots = append(g.shots, &Shot{Kind: shotLaser, Ground: from, Vel: geom.FromAngle(a).Scale(fanSpeed), H: 22, Life: 2.5})
+	}
+	g.sound("laser", from)
+}
+
+// acidBarrage lobs n globs on and around where the player is heading.
+func (g *Game) acidBarrage(from geom.Vec, n int) {
 	p := g.player
+	for i := 0; i < n; i++ {
+		to := p.Pos.Add(p.Vel.Scale(globLead)).Add(geom.FromAngle(g.rng.Float64() * 2 * math.Pi).Scale(float64(i) * 20))
+		g.shots = append(g.shots, &Shot{Kind: shotGlob, From: from, To: to, Ground: from,
+			Dur: 0.5 + from.Dist(to)/420 + float64(i)*0.08, H: 12})
+	}
+	g.sound("spit", from)
+}
+
+func (g *Game) broodAttack(e *Enemy, enraged bool) {
 	from := e.Pos.Sub(geom.V(0, 4))
 	pattern := e.Pattern % 3
 	e.Pattern++
@@ -541,12 +579,7 @@ func (g *Game) broodAttack(e *Enemy, enraged bool) {
 		if enraged {
 			n = 5
 		}
-		for i := 0; i < n; i++ {
-			to := p.Pos.Add(p.Vel.Scale(globLead)).Add(geom.FromAngle(g.rng.Float64() * 2 * math.Pi).Scale(float64(i) * 20))
-			g.shots = append(g.shots, &Shot{Kind: shotGlob, From: from, To: to, Ground: from,
-				Dur: 0.5 + from.Dist(to)/420 + float64(i)*0.08, H: 12})
-		}
-		g.sound("spit", from)
+		g.acidBarrage(from, n)
 	case 2: // brood
 		kinds := "CCC"
 		if enraged {
@@ -560,6 +593,110 @@ func (g *Game) broodAttack(e *Enemy, enraged bool) {
 			g.spawnHunter(kinds[i], pos)
 		}
 		g.sound("boss_roar", from)
+	}
+}
+
+// updateOvermind runs the deck 4 boss. It never moves. While any of its
+// nodes stands it is shielded and takes no damage; destroying them all drops
+// the shield and stuns it for overmindExpose seconds, then the nodes grow
+// back. It cycles a spinning spiral of spines, a laser fan and an acid
+// barrage. Below half health the spiral has more arms and spins faster,
+// every attack is bigger and the shield comes back sooner.
+func (g *Game) updateOvermind(e *Enemy, st enemyStats, d float64) {
+	enraged := e.HP*2 < st.hp
+	nodes := 0
+	for _, o := range g.enemies {
+		if o.Parent == e && o.State != stDead {
+			nodes++
+		}
+	}
+	switch {
+	case nodes > 0:
+		e.Shielded = true
+	case e.Shielded: // the last node just fell
+		e.Shielded, e.Exposed = false, overmindExpose
+		if enraged {
+			e.Exposed *= 0.75
+		}
+		e.setState(stChase) // stunned: whatever it was doing stops
+		g.sound("shield_down", e.Pos)
+		g.say("SHIELD DOWN", 1.5)
+	case e.Exposed > 0:
+		e.Exposed -= dt
+	default: // the nodes grow back (and grow in the first time)
+		g.growNodes(e)
+		e.Shielded = true
+		e.CD = max(e.CD, 1)
+		g.sound("shield_up", e.Pos)
+	}
+	if d < 24 {
+		g.hurtPlayer(2, e.Pos) // touching it hurts
+	}
+	if e.Exposed > 0 {
+		return
+	}
+	from := e.Pos.Sub(geom.V(0, 20))
+	switch e.State {
+	case stAttack:
+		pattern := (e.Pattern - 1) % 3
+		if pattern == 0 { // the spiral: volleys of spines along slowly turning arms
+			arms, spin := 2, 2.2
+			if enraged {
+				arms, spin = 3, 3.0
+			}
+			for ; e.T >= e.NextShot && e.NextShot < overmindSpiral; e.NextShot += spiralGap {
+				for k := 0; k < arms; k++ {
+					a := e.Strafe*e.NextShot*spin + float64(k)*2*math.Pi/float64(arms)
+					g.shots = append(g.shots, &Shot{Kind: shotSpine, Ground: from, Vel: geom.FromAngle(a).Scale(spineSpeed), H: 20, Life: 3})
+				}
+				g.sound("spine", from)
+			}
+			if e.T >= overmindSpiral {
+				e.setState(stChase)
+				e.CD = st.cooldown
+			}
+			return
+		}
+		if !e.Fired && e.T >= st.fireAt {
+			e.Fired = true
+			switch {
+			case pattern == 1 && enraged:
+				g.laserFan(from, 7)
+			case pattern == 1:
+				g.laserFan(from, 5)
+			case enraged:
+				g.acidBarrage(from, 6)
+			default:
+				g.acidBarrage(from, 4)
+			}
+		}
+		if e.T >= st.attackLen {
+			e.setState(stChase)
+			e.CD = st.cooldown
+			if enraged {
+				e.CD *= 0.7
+			}
+		}
+	default:
+		if e.CD <= 0 {
+			e.Pattern++
+			e.setState(stAttack)
+			e.NextShot = 0
+			e.Strafe = []float64{-1, 1}[g.rng.Intn(2)] // which way the spiral turns
+		}
+	}
+}
+
+// growNodes puts the Overmind's nodes in a ring around it.
+func (g *Game) growNodes(e *Enemy) {
+	for i := 0; i < overmindNodes; i++ {
+		dir := geom.FromAngle(-math.Pi/2 + float64(i)*2*math.Pi/overmindNodes)
+		pos := e.Pos.Add(dir.Scale(nodeRing))
+		if g.lvl.RectBlocked(pos, 4, 3, false) {
+			pos = e.Pos.Add(dir.Scale(nodeRing / 2))
+		}
+		g.spawnHunter('I', pos).Parent = e
+		g.spawnFX("fx.hit_spark", pos.Sub(geom.V(0, 12)), 0)
 	}
 }
 
@@ -787,7 +924,7 @@ func (g *Game) updateDrone(e *Enemy, st enemyStats, d float64, los bool) {
 }
 
 func (g *Game) damageEnemy(e *Enemy, dmg int, from geom.Vec) {
-	if e.State == stDead || e.hidden() {
+	if e.State == stDead || e.hidden() || e.Shielded {
 		return
 	}
 	e.HP -= dmg
@@ -825,7 +962,7 @@ func (g *Game) kill(e *Enemy) {
 			c.HP, c.CD, c.Parent = splitHP, 0.5, e
 		}
 		g.spawnFX("fx.acid_splash", e.Pos, 0)
-	case brood, warden, maw:
+	case brood, warden, maw, overmind:
 		g.say(bossName[e.Kind]+" DOWN", 2.5)
 		g.stinger("victory")
 		for i := 0; i < 6; i++ {
@@ -845,7 +982,8 @@ func (g *Game) kill(e *Enemy) {
 
 var deathSound = map[enemyKind]string{crawler: "crawler_death", spitter: "spitter_death", drone: "drone_death",
 	bomber: "explosion", brute: "brute_death", brood: "boss_death", warden: "warden_death", maw: "boss_death",
-	splitter: "splitter_death", shielder: "shielder_death", nest: "nest_death"}
+	splitter: "splitter_death", shielder: "shielder_death", nest: "nest_death",
+	overmind: "boss_death", node: "drone_death"}
 
 // height is how far above the feet an enemy's body centre is (for aiming).
 func (e *Enemy) height() float64 {
@@ -860,6 +998,10 @@ func (e *Enemy) height() float64 {
 		return 26
 	case shielder:
 		return 9
+	case overmind:
+		return 22
+	case node:
+		return 12
 	}
 	return 7
 }

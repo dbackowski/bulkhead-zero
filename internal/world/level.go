@@ -23,7 +23,7 @@ const T = 24
 //	decals: a acid  z scorch  ~ cables
 //	props:  x crate  c console  k locker  t terminal  b toxic barrel  B explosive barrel
 //	spawns: @ player  C crawler  S spitter  R drone  E bomber  G brute
-//	        Y splitter  U shield-bearer  N nest  Q boss
+//	        Y splitter  U shield-bearer  N nest  Q boss (which one is set per deck)
 const wallChars = "#LP!D="
 
 var floorChars = map[byte]string{'g': "floor_grate", 'h': "floor_hazard", 'v': "floor_vent", 's': "floor_lightstrip", 'o': "floor_soil"}

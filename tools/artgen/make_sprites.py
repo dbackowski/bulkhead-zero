@@ -1287,6 +1287,127 @@ def maw_anims():
 # ============================================================================
 # FX - projectiles and impacts (game rotates bullets/lasers to their heading)
 # ============================================================================
+# ============================================================================
+# BOSS 4 - the Overmind, the hive mind fused into the station's main computer.
+# 48x48, faces the camera, never moves: a swollen brain with one eye on a
+# machine pedestal, cables and tendrils grown into each other.
+# ============================================================================
+def overmind(pulse=0.0, eye=0, screen=0, wreck=False):
+    img = new(B, B)
+    rect(img, 9, 34, 39, 44, G0)                                        # pedestal
+    rect(img, 10, 34, 38, 41, G1)
+    rect(img, 10, 34, 38, 34, G2)
+    for i, sx in enumerate((12, 21, 30)):                                # status screens
+        on = (i + screen) % 3
+        rect(img, sx, 37, sx + 5, 39, U0)
+        rect(img, sx + 1, 38, sx + 1 + (on + 1), 38, CY if on else CY_D)
+    for hx in range(10, 39):                                            # hazard band
+        if (hx // 2) % 2:
+            put(img, hx, 42, AMB)
+    for cx0, cx1 in ((12, 16), (36, 32), (18, 20), (30, 28)):           # cables up into the brain
+        line(img, cx0, 34, cx1, 26, U0)
+        line(img, cx0 + 1, 34, cx1 + 1, 26, U1)
+    if wreck:
+        ellipse(img, 24, 30, 13, 5, X0)                                  # a deflated husk
+        ellipse(img, 24, 29, 10, 3.5, X1)
+        for fx in (17, 23, 30):
+            line(img, fx, 27, fx + 2, 31, X0)
+        ellipse(img, 24, 29, 3, 1.4, RED_DD)
+        rng = random.Random(9)
+        for _ in range(25):
+            put(img, rng.randint(10, 38), rng.randint(34, 41), rng.choice([U0, G0, (60, 60, 64, 255)]))
+        return outline(img)
+    rx, ry = 15 + pulse, 12 + pulse * .8                                # the brain
+    cy = 19 - pulse * .5
+    ellipse(img, 24, cy, rx, ry, X1)
+    ellipse(img, 22, cy - 4, rx * .7, ry * .5, X2)
+    ellipse(img, 19, cy - 7, 4, 1.6, X3)
+    line(img, 24, cy - ry + 1, 24, cy - 5, X0)                          # the split down the middle
+    for fx, fy, dx in ((13, cy - 3, 4), (16, cy + 4, 5), (31, cy - 4, -4), (30, cy + 5, -5), (20, cy - 8, 3), (28, cy - 8, -3)):
+        line(img, fx, fy, fx + dx, fy + 2, X0)                          # folds
+        line(img, fx + dx, fy + 2, fx + dx * 1.6, fy, X0)
+    for tx0, tx1 in ((12, 10), (36, 38)):                                # tendrils gripping the pedestal
+        line(img, tx0, cy + 6, tx1, 35, X1)
+        line(img, tx0 + 1, cy + 7, tx1 + 1, 35, X2)
+    ey = cy + 3                                                          # the eye
+    ellipse(img, 24, ey, 6, 4.5, OUT)
+    ellipse(img, 24, ey, 5, 3.6, BONE)
+    iris = [RED_D, RED, FLASH2][eye]
+    ellipse(img, 24, ey, 2.6 + eye * .4, 2.6 + eye * .4, iris)
+    ellipse(img, 24, ey, 1, 1.6, OUT)
+    put(img, 22, ey - 2, WHITE)
+    out = outline(img)
+    if eye == 2:                                                         # a glow ring when it attacks
+        for ang in range(0, 360, 30):
+            put(out, 24 + math.cos(math.radians(ang)) * 9, ey + math.sin(math.radians(ang)) * 7, (255, 120, 90, 200))
+    return out
+
+
+def overmind_anims():
+    a = {}
+    a["idle"] = [boss_shadow(overmind(pulse=p, screen=i), rx=16) for i, p in enumerate((0, .5, 1, .5))]
+    a["attack"] = [boss_shadow(overmind(pulse=p, eye=e, screen=i), rx=16)
+                   for i, (p, e) in enumerate(((1, 1), (1.5, 2), (1.5, 2), (1, 1)))]
+    smoke = (60, 60, 64, 200)
+    dead = []
+    for i in range(6):
+        if i == 0:
+            spr = tint(overmind(pulse=1.5, eye=2), WHITE, .85)
+        elif i == 1:
+            spr = overmind(pulse=2, eye=2)
+            flash_star(spr, 18, 14, 2); flash_star(spr, 31, 22, 2)
+        else:
+            spr = overmind(wreck=True)
+            if i < 5:
+                flash_star(spr, 14 + i * 4, 33 - i, 1)
+                for k in range(4 + i):
+                    put(spr, 18 + k * 2, 26 - k % 2 - i, smoke)
+        dead.append(boss_shadow(spr, rx=16))
+    a["death"] = dead
+    return a
+
+
+# ============================================================================
+# ENEMY 9 - Node, a pylon that powers the Overmind's shield. Faces the camera.
+# ============================================================================
+def node(glow=0, broken=False):
+    img = new()
+    rect(img, 7, 17, 17, 20, G0)                                         # base
+    rect(img, 8, 17, 16, 18, G1)
+    put(img, 9, 19, AMB); put(img, 15, 19, AMB)
+    if broken:
+        rect(img, 10, 13, 14, 17, G1)                                     # a snapped stump
+        for x, y in ((10, 12), (12, 11), (14, 12)):
+            put(img, x, y, G0)
+        ellipse(img, 12, 19, 4, 1, X0)
+        return outline(img)
+    rect(img, 10, 9, 14, 17, G1)                                          # the column
+    rect(img, 10, 9, 10, 17, G2)
+    rect(img, 12, 10, 12, 16, CY_D if glow < 2 else CY)                  # energy line
+    ellipse(img, 12, 6, 4.5, 4, X1)                                       # the organic bulb on top
+    ellipse(img, 11, 5, 2.5, 1.6, X2)
+    c = [CY_D, CY, (200, 250, 255, 255)][glow]
+    ellipse(img, 12, 6.5, 1.8 + glow * .3, 1.6 + glow * .3, c)
+    out = outline(img)
+    if glow == 2:
+        for ang in range(0, 360, 60):
+            put(out, 12 + math.cos(math.radians(ang)) * 6, 6 + math.sin(math.radians(ang)) * 5, (120, 230, 245, 170))
+    return out
+
+
+def node_anims():
+    a = {}
+    a["idle"] = [with_shadow(node(glow=gl), rx=6) for gl in (0, 1, 2, 1)]
+    sparks = node(broken=True)
+    flash_star(sparks, 12, 10, 2)
+    a["death"] = [
+        with_shadow(tint(node(glow=2), WHITE, .85), rx=6),
+        with_shadow(sparks, rx=6),
+        with_shadow(node(broken=True), rx=6),
+    ]
+    return a
+
+
 def fx_anims():
     a = {}
     b = []
@@ -1507,6 +1628,8 @@ def build_all():
         "splitter": splitter_anims(),
         "shielder": shielder_anims(),
         "nest": nest_anims(),
+        "overmind": overmind_anims(),
+        "node": node_anims(),
         "fx": fx,
     }
 
@@ -1557,9 +1680,10 @@ def main():
                                                   ("brute.", all_["brute"]),
                                                   ("splitter.", all_["splitter"]),
                                                   ("shielder.", all_["shielder"]),
-                                                  ("nest.", all_["nest"])])
+                                                  ("nest.", all_["nest"]),
+                                                  ("node.", all_["node"])])
     b_sheet, b_meta = write_sheet("bosses.png", [("brood.", all_["boss"]), ("warden.", all_["warden"]),
-                                                ("maw.", all_["maw"])], size=B)
+                                                ("maw.", all_["maw"]), ("overmind.", all_["overmind"])], size=B)
     t_sheet, t_meta = font_sheet()
     t_sheet.save("font.png")
     f_sheet, f_meta = write_sheet("fx.png", [("", all_["fx"])])

@@ -80,7 +80,11 @@ func (g *Game) drawHUD(dst *ebiten.Image) {
 		name := bossName[b.Kind]
 		f.Draw(dst, name, (ScreenW-f.Width(name, 1))/2, 5, 1, textAmber)
 		vector.FillRect(dst, ScreenW/2-80, 16, 160, 6, hpEmpty, false)
-		vector.FillRect(dst, ScreenW/2-80, 16, 160*float32(max(b.HP, 0))/float32(stats[b.Kind].hp), 6, bossHP, false)
+		bar := bossHP
+		if b.Shielded {
+			bar = hudLine // the Overmind's shield is up: its health bar turns shield-blue
+		}
+		vector.FillRect(dst, ScreenW/2-80, 16, 160*float32(max(b.HP, 0))/float32(stats[b.Kind].hp), 6, bar, false)
 		vector.StrokeRect(dst, ScreenW/2-81, 15, 162, 8, 1, hudLine, false)
 	} else {
 		f.Draw(dst, fmt.Sprintf("DECK %d  WAVE %d/%d", g.level+1, g.wave, g.waveCount()), 5, 5, 1, textAmber)

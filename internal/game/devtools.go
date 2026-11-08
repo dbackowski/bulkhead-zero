@@ -81,8 +81,8 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 		if _, warn, wt := e.mawPhase(); warn && wt > a.reaction && e.Pos.Dist(p.Pos) < mawBurst {
 			dig = e // about to burst out right here
 		}
-		if e.State == stDead || e.hidden() {
-			continue
+		if e.State == stDead || e.hidden() || e.Shielded {
+			continue // a shielded Overmind isn't worth a shot: go for its nodes
 		}
 		d := e.Pos.Dist(p.Pos)
 		if near == nil || d < dn {
@@ -194,7 +194,7 @@ func (a *autopilot) input(g *Game, _ Input) Input {
 	// movement: back off from close melee enemies, strafe while shooting at
 	// mid range, walk the path toward far targets, otherwise grab pickups,
 	// otherwise hunt. Sideways moves switch sides when that side is blocked.
-	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, brood: 60, maw: 50, splitter: 45, shielder: 45}
+	backOff := map[enemyKind]float64{crawler: 40, bomber: 70, brute: 55, brood: 60, maw: 50, splitter: 45, shielder: 45, overmind: 60}
 	var to, side geom.Vec
 	if vis != nil {
 		to = vis.Pos.Sub(p.Pos).Norm()
